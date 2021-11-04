@@ -25,7 +25,7 @@ const ETHEREUM_MAINNET_URL = `https://mainnet.infura.io/v3/${config.infuraApiKey
 //TODO move urls to a config file
 class WalletManager extends AbstractWalletManager implements WalletManagerI {
   wallets: StateType['wallets'] = []
-  password: string = ''
+  password = ''
   cryptoassets: any = assets
   chains: any = chains
   storageManager: StorageManagerI<StateType>
@@ -236,7 +236,7 @@ class WalletManager extends AbstractWalletManager implements WalletManagerI {
       `${COIN_GECKO_API}/simple/price?ids=${coindIds.join(',')}&vs_currencies=${toCurrency}`
     )
 
-    let prices = Object.keys(data).reduce((acc: any, coinGeckoId) => {
+    const prices = Object.keys(data).reduce((acc: any, coinGeckoId) => {
       const asset = Object.entries<Asset>(this.cryptoassets).find((entry) => {
         return entry[1].coinGeckoId === coinGeckoId
       })

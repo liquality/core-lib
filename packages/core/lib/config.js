@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChainNetworks = exports.chainDefaultColors = exports.accountColors = void 0;
 const types_1 = require("./types");
-const types_2 = require("@liquality/cryptoassets/src/types");
+const cryptoassets_1 = require("@liquality/cryptoassets");
 const bitcoin_networks_1 = require("@liquality/bitcoin-networks");
 const ethereum_networks_1 = require("@liquality/ethereum-networks");
 exports.accountColors = [
@@ -30,11 +30,11 @@ exports.chainDefaultColors = {
     arbitrum: '#28A0EF'
 };
 exports.ChainNetworks = {
-    [types_2.ChainId.Bitcoin]: {
+    [cryptoassets_1.ChainId.Bitcoin]: {
         [types_1.NetworkEnum.Testnet]: bitcoin_networks_1.BitcoinNetworks.bitcoin_testnet,
         [types_1.NetworkEnum.Mainnet]: bitcoin_networks_1.BitcoinNetworks.bitcoin
     },
-    [types_2.ChainId.Ethereum]: {
+    [cryptoassets_1.ChainId.Ethereum]: {
         [types_1.NetworkEnum.Testnet]: ethereum_networks_1.EthereumNetworks.ropsten,
         [types_1.NetworkEnum.Mainnet]: ethereum_networks_1.EthereumNetworks.ethereum_mainnet
     }

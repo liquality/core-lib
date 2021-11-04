@@ -1,4 +1,4 @@
-import { ChainId } from '@liquality/cryptoassets/src/types';
+import { ChainId } from '@liquality/cryptoassets';
 import { BitcoinNetwork } from '@liquality/bitcoin-networks';
 import { EthereumNetwork } from '@liquality/ethereum-networks';
 import { FeeDetails } from '@liquality/types/lib/fees';

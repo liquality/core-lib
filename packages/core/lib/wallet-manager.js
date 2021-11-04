@@ -211,7 +211,7 @@ class WalletManager extends abstract_wallet_manager_1.default {
                 .filter((currency) => { var _a; return (_a = this.cryptoassets[currency]) === null || _a === void 0 ? void 0 : _a.coinGeckoId; })
                 .map((currency) => this.cryptoassets[currency].coinGeckoId);
             const { data } = yield axios_1.default.get(`${COIN_GECKO_API}/simple/price?ids=${coindIds.join(',')}&vs_currencies=${toCurrency}`);
-            let prices = Object.keys(data).reduce((acc, coinGeckoId) => {
+            const prices = Object.keys(data).reduce((acc, coinGeckoId) => {
                 const asset = Object.entries(this.cryptoassets).find((entry) => {
                     return entry[1].coinGeckoId === coinGeckoId;
                 });

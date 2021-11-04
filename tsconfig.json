@@ -5,12 +5,7 @@
     "declaration": true,
     "target": "es6",
     "sourceMap": true,
-    "lib": [
-      "es6"
-    ]
+    "lib": ["es6"]
   },
-  "exclude": [
-    "node_modules",
-    "__tests__"
-  ]
- }
+  "exclude": ["node_modules", "__tests__"]
+}

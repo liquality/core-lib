@@ -8,7 +8,7 @@ import { assets as cryptoassets, unitToCurrency } from '@liquality/cryptoassets'
 export default class DataMapper implements DataMapperI<StateType, FlatState> {
   state: StateType
   totalBalance: BigNumber = new BigNumber(0)
-  assetCount: number = 0
+  assetCount = 0
 
   constructor(state: StateType) {
     this.state = state
@@ -21,7 +21,7 @@ export default class DataMapper implements DataMapperI<StateType, FlatState> {
     const { activeWalletId, activeNetwork, accounts, fiatRates } = this.state
     const _accounts = accounts?.[activeWalletId!]?.[activeNetwork!]
 
-    for (let account of _accounts!) {
+    for (const account of _accounts!) {
       if (Object.keys(account.balances!).length === 0) {
         continue
       }

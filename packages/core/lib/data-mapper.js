@@ -21,7 +21,7 @@ class DataMapper {
         let assetCounter = 0;
         const { activeWalletId, activeNetwork, accounts, fiatRates } = this.state;
         const _accounts = (_a = accounts === null || accounts === void 0 ? void 0 : accounts[activeWalletId]) === null || _a === void 0 ? void 0 : _a[activeNetwork];
-        for (let account of _accounts) {
+        for (const account of _accounts) {
             if (Object.keys(account.balances).length === 0) {
                 continue;
             }

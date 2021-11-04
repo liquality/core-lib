@@ -1,5 +1,5 @@
 import { ChainNetworkType, NetworkEnum } from './types';
-import { ChainId } from '@liquality/cryptoassets/src/types';
+import { ChainId } from '@liquality/cryptoassets';
 export declare const accountColors: string[];
 export declare const chainDefaultColors: Partial<Record<ChainId, string>>;
 export declare const ChainNetworks: Partial<ChainNetworkType>;
