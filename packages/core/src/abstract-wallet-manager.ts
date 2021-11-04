@@ -81,6 +81,7 @@ export default class AbstractWalletManager {
     )
 
     btcClient.addProvider(
+      // @ts-expect-error FIXME
       new BitcoinJsWalletProvider({
         network: bitcoinNetwork as BitcoinNetwork,
         mnemonic,

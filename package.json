@@ -1,13 +1,13 @@
 {
   "private": true,
   "scripts": {
+    "prepare": "husky install",
     "lerna": "lerna",
     "lint": "eslint --ignore-path .gitignore --ext .js,.jsx,.ts,.tsx **/src/**/*",
     "prettier": "prettier --ignore-path .gitignore --write **/src/**/*",
     "dev": "tsc --watch --noEmit",
     "build": "lerna run build",
-    "test": "jest",
-    "prepare": "husky install"
+    "test": "jest"
   },
   "devDependencies": {
     "@types/node": "^16.11.6",

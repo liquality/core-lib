@@ -13,5 +13,27 @@
   "scripts": {
     "build": "tsc",
     "test": "echo \"Error: run tests from root\" && exit 1"
+  },
+  "devDependencies": {
+    "@types/uuid": "^8.3.1"
+  },
+  "dependencies": {
+    "@liquality/bitcoin-esplora-batch-api-provider": "^1.9.1",
+    "@liquality/bitcoin-fee-api-provider": "^1.9.1",
+    "@liquality/bitcoin-js-wallet-provider": "^1.9.1",
+    "@liquality/bitcoin-networks": "^1.9.1",
+    "@liquality/bitcoin-rpc-fee-provider": "^1.9.1",
+    "@liquality/client": "^1.9.1",
+    "@liquality/cryptoassets": "^1.6.2",
+    "@liquality/ethereum-gas-now-fee-provider": "^1.9.1",
+    "@liquality/ethereum-js-wallet-provider": "^1.9.1",
+    "@liquality/ethereum-networks": "^1.9.1",
+    "@liquality/ethereum-rpc-fee-provider": "^1.9.1",
+    "@liquality/ethereum-rpc-provider": "^1.9.1",
+    "@liquality/types": "^1.9.1",
+    "axios": "^0.24.0",
+    "bip39": "^3.0.4",
+    "crypto-js": "^4.1.1",
+    "uuid": "^8.3.2"
   }
 }
