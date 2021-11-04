@@ -5,6 +5,7 @@
     "lerna": "lerna",
     "lint": "eslint --ignore-path .gitignore --ext .js,.jsx,.ts,.tsx **/src/**/*",
     "prettier": "prettier --ignore-path .gitignore --write **/src/**/*",
+    "typecheck": "tsc --noEmit",
     "dev": "tsc --watch --noEmit",
     "build": "lerna run build",
     "test": "jest"

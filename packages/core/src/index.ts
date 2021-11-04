@@ -20,6 +20,5 @@ export default {
   DataMapper,
   EncryptionManager,
   // StorageManager,
-  TaskRunner,
-
+  TaskRunner
 }
