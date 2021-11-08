@@ -15,6 +15,7 @@ import { EthereumNetwork } from '@liquality/ethereum-networks'
 import { EthereumGasNowFeeProvider } from '@liquality/ethereum-gas-now-fee-provider'
 import { EthereumRpcFeeProvider } from '@liquality/ethereum-rpc-fee-provider'
 import axios from 'axios'
+// FIXME export
 import { Asset } from '@liquality/cryptoassets/dist/src/types'
 import AbstractWalletManager from './abstract-wallet-manager'
 import { SendOptions, Transaction } from '@liquality/types'
@@ -26,8 +27,8 @@ const ETHEREUM_MAINNET_URL = `https://mainnet.infura.io/v3/${config.infuraApiKey
 class WalletManager extends AbstractWalletManager implements WalletManagerI {
   wallets: StateType['wallets'] = []
   password = ''
-  cryptoassets: any = assets
-  chains: any = chains
+  cryptoassets: typeof assets = assets
+  chains: unknown = chains
   storageManager: StorageManagerI<StateType>
   encryptionManager: EncryptionManagerI
 
@@ -236,7 +237,7 @@ class WalletManager extends AbstractWalletManager implements WalletManagerI {
       `${COIN_GECKO_API}/simple/price?ids=${coindIds.join(',')}&vs_currencies=${toCurrency}`
     )
 
-    const prices = Object.keys(data).reduce((acc: any, coinGeckoId) => {
+    const prices = Object.keys(data).reduce((acc: unknown, coinGeckoId) => {
       const asset = Object.entries<Asset>(this.cryptoassets).find((entry) => {
         return entry[1].coinGeckoId === coinGeckoId
       })
@@ -255,7 +256,7 @@ class WalletManager extends AbstractWalletManager implements WalletManagerI {
       }
     }
 
-    return Object.keys(prices).reduce((acc: any, assetName) => {
+    return Object.keys(prices).reduce((acc: unknown, assetName) => {
       acc[assetName] = prices[assetName][toCurrency.toUpperCase()]
       return acc
     }, {})

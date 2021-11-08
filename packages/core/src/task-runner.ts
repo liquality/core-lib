@@ -9,7 +9,7 @@ export interface TaskRunnerI<T> {
 class TaskRunner implements TaskRunnerI<Task> {
   tasks: Task[]
   interval: number
-  handle: any
+  handle: NodeJS.Timer
 
   constructor(tasks: Task[], interval: number) {
     if (!tasks || tasks.length === 0) {

@@ -1,3 +1,4 @@
+/// <reference types="node" />
 declare type Task = () => boolean;
 export interface TaskRunnerI<T> {
     scheduleTasks: (tasks: T[]) => number;
@@ -7,7 +8,7 @@ export interface TaskRunnerI<T> {
 declare class TaskRunner implements TaskRunnerI<Task> {
     tasks: Task[];
     interval: number;
-    handle: any;
+    handle: NodeJS.Timer;
     constructor(tasks: Task[], interval: number);
     scheduleTasks(tasks: Task[]): number;
     start(): void;

@@ -9,7 +9,7 @@ import { EthereumGasNowFeeProvider } from '@liquality/ethereum-gas-now-fee-provi
  * The idea is to use strategy pattern to handle logic related to different chains
  */
 export default class AbstractWalletManager {
-    cryptoassets: any;
+    cryptoassets: unknown;
     storageManager: StorageManagerI<StateType> | undefined;
     client: Client | undefined;
     protected getNextAccountColor(chain: ChainId, index: number): string;

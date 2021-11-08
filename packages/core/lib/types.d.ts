@@ -72,7 +72,7 @@ export interface StateType {
     enabledAssets?: Record<NetworkEnum, {
         [walletId: string]: string[];
     }>;
-    customTokens?: any;
+    customTokens?: unknown;
     accounts?: Record<string, Partial<Record<NetworkEnum, AccountType[]>>>;
     fiatRates?: Record<string, number>;
     fees?: Partial<Record<NetworkEnum, {
@@ -80,11 +80,11 @@ export interface StateType {
             [asset: string]: FeeDetails;
         };
     }>>;
-    history?: any;
-    marketData?: any;
+    history?: unknown;
+    marketData?: unknown;
     activeNetwork?: NetworkEnum;
     activeWalletId?: string;
-    activeAsset?: any;
+    activeAsset?: unknown;
     keyUpdatedAt?: number;
     keySalt?: string;
     termsAcceptedAt?: number;
@@ -92,7 +92,7 @@ export interface StateType {
     injectEthereum?: boolean;
     injectEthereumChain?: string;
     usbBridgeWindowsId?: number;
-    externalConnections?: any;
+    externalConnections?: unknown;
     analytics?: {
         userId: string;
         acceptedDate: number;

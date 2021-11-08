@@ -1,11 +1,12 @@
 import { ArrayElement, EncryptionManagerI, StateType, StorageManagerI, WalletManagerI } from './types';
+import { assets } from '@liquality/cryptoassets';
 import AbstractWalletManager from './abstract-wallet-manager';
 import { SendOptions, Transaction } from '@liquality/types';
 declare class WalletManager extends AbstractWalletManager implements WalletManagerI {
     wallets: StateType['wallets'];
     password: string;
-    cryptoassets: any;
-    chains: any;
+    cryptoassets: typeof assets;
+    chains: unknown;
     storageManager: StorageManagerI<StateType>;
     encryptionManager: EncryptionManagerI;
     constructor(storageManager: StorageManagerI<StateType>, encryptionManager: EncryptionManagerI);

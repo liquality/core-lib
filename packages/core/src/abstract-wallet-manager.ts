@@ -21,7 +21,7 @@ const BITCOIN_FEE_API_URL = 'https://liquality.io/swap/mempool/v1/fees/recommend
  * The idea is to use strategy pattern to handle logic related to different chains
  */
 export default class AbstractWalletManager {
-  cryptoassets: any
+  cryptoassets: unknown
   storageManager: StorageManagerI<StateType> | undefined
   //TODO we need to support other chains as well
   client: Client | undefined
