@@ -1,45 +1,15 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
+const tslib_1 = require("tslib");
 const uuid_1 = require("uuid");
-const config_1 = __importStar(require("./config"));
+const config_1 = (0, tslib_1.__importStar)(require("./config"));
 const types_1 = require("./types");
 const bip39_1 = require("bip39");
 const cryptoassets_1 = require("@liquality/cryptoassets");
 const ethereum_gas_now_fee_provider_1 = require("@liquality/ethereum-gas-now-fee-provider");
 const ethereum_rpc_fee_provider_1 = require("@liquality/ethereum-rpc-fee-provider");
-const axios_1 = __importDefault(require("axios"));
-const abstract_wallet_manager_1 = __importDefault(require("./abstract-wallet-manager"));
+const axios_1 = (0, tslib_1.__importDefault)(require("axios"));
+const abstract_wallet_manager_1 = (0, tslib_1.__importDefault)(require("./abstract-wallet-manager"));
 const ETHEREUM_TESTNET_URL = `https://ropsten.infura.io/v3/${config_1.default.infuraApiKey}`;
 const ETHEREUM_MAINNET_URL = `https://mainnet.infura.io/v3/${config_1.default.infuraApiKey}`;
 //TODO move urls to a config file
@@ -57,7 +27,7 @@ class WalletManager extends abstract_wallet_manager_1.default {
      * Creates a wallet along with an account
      */
     createWallet(wallet, password) {
-        return __awaiter(this, void 0, void 0, function* () {
+        return (0, tslib_1.__awaiter)(this, void 0, void 0, function* () {
             const walletId = (0, uuid_1.v4)();
             this.wallets = [
                 Object.assign({ id: walletId, at: Date.now(), name: 'Account-1' }, wallet)
@@ -70,7 +40,7 @@ class WalletManager extends abstract_wallet_manager_1.default {
             networks.forEach((network) => {
                 const assetKeys = defaultAssets[network];
                 accounts[walletId][network] = [];
-                config_1.default.chains.forEach((chainId) => __awaiter(this, void 0, void 0, function* () {
+                config_1.default.chains.forEach((chainId) => (0, tslib_1.__awaiter)(this, void 0, void 0, function* () {
                     var _a;
                     const assetList = assetKeys.filter((asset) => {
                         var _a;
@@ -110,7 +80,7 @@ class WalletManager extends abstract_wallet_manager_1.default {
         });
     }
     retrieveWallet() {
-        return __awaiter(this, void 0, void 0, function* () {
+        return (0, tslib_1.__awaiter)(this, void 0, void 0, function* () {
             return this.storageManager.read();
         });
     }
@@ -118,7 +88,7 @@ class WalletManager extends abstract_wallet_manager_1.default {
      * Decrypts the encrypted wallet
      */
     restoreWallet(password, state) {
-        return __awaiter(this, void 0, void 0, function* () {
+        return (0, tslib_1.__awaiter)(this, void 0, void 0, function* () {
             const { encryptedWallets, keySalt } = state;
             if (!encryptedWallets || !keySalt) {
                 throw new Error('Please import/create your wallet');
@@ -151,7 +121,7 @@ class WalletManager extends abstract_wallet_manager_1.default {
         });
     }
     sendTransaction(options) {
-        return __awaiter(this, void 0, void 0, function* () {
+        return (0, tslib_1.__awaiter)(this, void 0, void 0, function* () {
             if (!this.client) {
                 return new Error('client is not instantiated');
             }
@@ -161,7 +131,7 @@ class WalletManager extends abstract_wallet_manager_1.default {
     //TODO refactor
     updateAddressesAndBalances(state) {
         var _a, _b;
-        return __awaiter(this, void 0, void 0, function* () {
+        return (0, tslib_1.__awaiter)(this, void 0, void 0, function* () {
             const stateClone = Object.assign({}, state);
             for (const walletId in stateClone.accounts) {
                 const network = stateClone.accounts[walletId];
@@ -205,7 +175,7 @@ class WalletManager extends abstract_wallet_manager_1.default {
         });
     }
     getPricesForAssets(baseCurrencies, toCurrency) {
-        return __awaiter(this, void 0, void 0, function* () {
+        return (0, tslib_1.__awaiter)(this, void 0, void 0, function* () {
             const COIN_GECKO_API = 'https://api.coingecko.com/api/v3';
             const coindIds = baseCurrencies
                 .filter((currency) => { var _a; return (_a = this.cryptoassets[currency]) === null || _a === void 0 ? void 0 : _a.coinGeckoId; })

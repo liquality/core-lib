@@ -1,18 +1,7 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-const pbkdf2_1 = __importDefault(require("pbkdf2"));
+const tslib_1 = require("tslib");
+const pbkdf2_1 = (0, tslib_1.__importDefault)(require("pbkdf2"));
 const crypto_js_1 = require("crypto-js");
 const PBKDF2_ITERATIONS = 100000;
 const PBKDF2_LENGTH = 32;
@@ -54,7 +43,7 @@ class EncryptionManager {
         return global.Buffer.from(String.fromCharCode.apply(null, Array.from(view))).toString('base64');
     }
     encrypt(value, password) {
-        return __awaiter(this, void 0, void 0, function* () {
+        return (0, tslib_1.__awaiter)(this, void 0, void 0, function* () {
             const keySalt = this.generateSalt(16);
             const derivedKey = yield this.pbkdf2(password, keySalt);
             const rawEncryptedValue = crypto_js_1.AES.encrypt(value, derivedKey);
@@ -65,7 +54,7 @@ class EncryptionManager {
         });
     }
     decrypt(encrypted, keySalt, password) {
-        return __awaiter(this, void 0, void 0, function* () {
+        return (0, tslib_1.__awaiter)(this, void 0, void 0, function* () {
             if (!keySalt) {
                 return '';
             }
@@ -81,7 +70,7 @@ class EncryptionManager {
         });
     }
     pbkdf2(password, salt) {
-        return __awaiter(this, void 0, void 0, function* () {
+        return (0, tslib_1.__awaiter)(this, void 0, void 0, function* () {
             return new Promise((resolve, reject) => {
                 pbkdf2_1.default.pbkdf2(password, salt, PBKDF2_ITERATIONS, PBKDF2_LENGTH, PBKDF2_DIGEST, (err, derivedKey) => {
                     if (err) {
