@@ -1,7 +1,7 @@
 import { StateType } from './types';
 declare type AsyncStorage = {
-    setItem(key: string, value: string): Promise<unknown>;
-    getItem(key: string): Promise<string>;
+    setItem(key: string, value: string): Promise<void>;
+    getItem(key: string): Promise<string | null>;
 };
 export default function mkStorageManager(AsyncStorage: AsyncStorage): {
     new (storageKey: string, excludedProps: Array<keyof StateType>): {
