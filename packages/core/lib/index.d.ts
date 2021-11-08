@@ -1,6 +1,7 @@
 import AbstractWalletManager from './abstract-wallet-manager';
 import DataMapper from './data-mapper';
 import EncryptionManager from './encryption-manager';
+import mkStorageManager from './storage-manager';
 import TaskRunner from './task-runner';
 import * as config from './config';
 import * as types from './types';
@@ -19,6 +20,7 @@ declare const _default: {
     };
     config: typeof config;
     types: typeof types;
+    mkStorageManager: typeof mkStorageManager;
     AbstractWalletManager: typeof AbstractWalletManager;
     DataMapper: typeof DataMapper;
     EncryptionManager: typeof EncryptionManager;

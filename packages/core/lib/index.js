@@ -25,7 +25,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const abstract_wallet_manager_1 = __importDefault(require("./abstract-wallet-manager"));
 const data_mapper_1 = __importDefault(require("./data-mapper"));
 const encryption_manager_1 = __importDefault(require("./encryption-manager"));
-// import StorageManager from './storage-manager'
+const storage_manager_1 = __importDefault(require("./storage-manager"));
 const task_runner_1 = __importDefault(require("./task-runner"));
 const feeCalculatorFns = __importStar(require("./utils/fee-calculator"));
 const coinFormatterFns = __importStar(require("./utils/coin-formatter"));
@@ -35,10 +35,10 @@ exports.default = {
     utils: Object.assign(Object.assign({}, feeCalculatorFns), coinFormatterFns),
     config,
     types,
+    mkStorageManager: storage_manager_1.default,
     AbstractWalletManager: abstract_wallet_manager_1.default,
     DataMapper: data_mapper_1.default,
     EncryptionManager: encryption_manager_1.default,
-    // StorageManager,
     TaskRunner: task_runner_1.default
 };
 //# sourceMappingURL=index.js.map
