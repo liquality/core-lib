@@ -10,7 +10,7 @@
     "build": "lerna run build",
     "test": "jest",
     "version": "lerna version",
-    "publish": "lerna publish"
+    "publish": "lerna publish from-package"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": "eslint --cache"
