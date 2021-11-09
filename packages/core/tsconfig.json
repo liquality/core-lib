@@ -2,8 +2,11 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
-    "outDir": "./dist",
-    "importHelpers": true
+    "declaration": true,
+    "sourceMap": true,
+    "importHelpers": true,
+    "lib": ["ES2017"],
+    "outDir": "./dist"
   },
   "include": ["./src"]
 }
