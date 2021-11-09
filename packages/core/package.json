@@ -1,6 +1,6 @@
 {
   "name": "@liquality/core",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Liquality Core Library",
   "main": "dist/index.js",
   "directories": {
