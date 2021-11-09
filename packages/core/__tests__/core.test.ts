@@ -1,4 +1,4 @@
-import * as core from '..' // imports from built files!
+import * as core from '../src'
 
 describe('core', () => {
   it('exports something', () => {
