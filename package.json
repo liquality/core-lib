@@ -8,7 +8,9 @@
     "typecheck": "tsc --noEmit",
     "dev": "tsc --watch --noEmit",
     "build": "lerna run build",
-    "test": "jest"
+    "test": "jest",
+    "version": "lerna version",
+    "publish": "lerna publish"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": "eslint --cache"
