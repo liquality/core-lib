@@ -3,6 +3,7 @@
   "scripts": {
     "prepare": "husky install",
     "lerna": "lerna",
+    "postinstall": "lerna bootstrap",
     "lint": "eslint --ext .js,.jsx,.ts,.tsx .",
     "prettier": "prettier --write .",
     "typecheck": "tsc --noEmit",
