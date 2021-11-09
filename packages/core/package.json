@@ -2,13 +2,13 @@
   "name": "@liquality/core",
   "version": "0.0.0",
   "description": "Liquality Core Library",
-  "main": "lib/index.js",
+  "main": "dist/index.js",
   "directories": {
-    "lib": "lib",
+    "lib": "dist",
     "test": "__tests__"
   },
   "files": [
-    "lib"
+    "dist"
   ],
   "scripts": {
     "build": "tsc",
