@@ -1,12 +1,9 @@
 {
   "compilerOptions": {
+    "noEmit": true,
     "esModuleInterop": true,
-    "importHelpers": true,
     "module": "commonjs",
-    "declaration": true,
-    "target": "es6",
-    "sourceMap": true,
-    "lib": ["es6"]
+    "target": "ES6"
   },
   "exclude": ["node_modules", "__tests__"]
 }
