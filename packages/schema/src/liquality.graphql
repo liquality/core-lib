@@ -1,0 +1,7 @@
+type What {
+  foo: String
+}
+
+type Query {
+  what: What
+}
