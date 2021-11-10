@@ -1,0 +1,8 @@
+type Query {
+  account(id: ID): Account
+  accounts(network: Network): [Account]
+}
+
+type Mutation {
+  transact(network: Network!, chainId: ID!, data: String): Transaction
+}

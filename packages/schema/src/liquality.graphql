@@ -1,7 +1,72 @@
-type What {
-  foo: String
+scalar DerivationPath
+scalar BigNumber
+directive @client on OBJECT | FIELD_DEFINITION
+directive @secret on FIELD_DEFINITION
+
+type Wallet @client {
+  id: ID!
+  mnemonic: String! @secret
+  password: String! @secret
+  accounts: [ID!]
 }
 
-type Query {
-  what: What
+type Account {
+  id: ID!
+  name: String @client
+  type: AccountType!
+  network: Network!
+  path: DerivationPath
+  address: CryptoAddress!
+  assets: [AccountAsset!]
+}
+
+enum Network {
+  MAINNET
+  TESTNET
+}
+
+type CryptoAddress {
+  key: String!
+  chainId: ID!
+}
+
+enum AccountType {
+  DERIVATION
+  LEDGER
+}
+
+type Chain {
+  id: ID!
+  name: String!
+  basePath: DerivationPath!
+}
+
+type AccountAsset {
+  token: Token!
+  chain: Chain!
+  balance: BigNumber!
+  transactions: [Transaction!]
+}
+
+type Token {
+  id: ID!
+  symbol: String!
+  type: TokenType!
+}
+
+enum TokenType {
+  NATIVE
+  ERC20
+  ERC721
+}
+
+type Transaction {
+  id: ID!
+  from: Hodl!
+  to: Hodl!
+}
+
+type Hodl {
+  what: Token!
+  where: CryptoAddress!
 }
