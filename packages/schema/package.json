@@ -14,10 +14,18 @@
   ],
   "scripts": {
     "build": "tsc",
+    "preserve": "tsc",
+    "serve": "node server.mjs",
     "test": "echo \"Error: run tests from root\" && exit 1"
   },
   "dependencies": {
     "@graphql-tools/graphql-file-loader": "^7.3.2",
     "@graphql-tools/load": "^7.4.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.13",
+    "express": "^4.17.1",
+    "express-graphql": "^0.12.0",
+    "get-port": "^6.0.0"
   }
 }
