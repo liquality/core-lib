@@ -47,18 +47,15 @@ type Account = {
 type Asset = {
   type: Token
   symbol: string
-  balance: BigAmount
+  balance: BigNumber
   getPastTransactions(): Promise<Transaction[]>
-  send(amount: BigAmount, to: Address): Promise<unknown>
+  transmit(amount: BigNumber, to: Address, payload?: unknown): Promise<Transaction>
 }
 
-type BigAmount = {
-  b: bigint
-  m: number
-}
+type BigNumber = string
 
 type Transaction = {
-  amount: BigAmount
+  amount: BigNumber
   from: Address
   to: Address
 }
