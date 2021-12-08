@@ -1,8 +1,6 @@
-import AbstractWalletManager from './abstract-wallet-manager'
 import DataMapper from './data-mapper'
-import EncryptionManager from './encryption-manager'
-import mkStorageManager from './storage-manager'
 import TaskRunner from './task-runner'
+import Wallet from './wallet'
 
 import * as feeCalculatorFns from './utils/fee-calculator'
 import * as coinFormatterFns from './utils/coin-formatter'
@@ -16,9 +14,7 @@ export default {
   },
   config,
   types,
-  mkStorageManager,
-  AbstractWalletManager,
+  Wallet,
   DataMapper,
-  EncryptionManager,
   TaskRunner
 }

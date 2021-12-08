@@ -1,4 +1,3 @@
-import BigNumber from 'bignumber.js'
 import {
   assets as cryptoassets,
   chains,
@@ -6,6 +5,7 @@ import {
   isEthereumChain,
   unitToCurrency
 } from '@liquality/cryptoassets'
+import { BigNumber } from '@liquality/types'
 import { prettyBalance } from './coin-formatter'
 
 const isERC20 = (asset: string) => {
