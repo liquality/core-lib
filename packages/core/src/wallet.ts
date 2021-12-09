@@ -98,7 +98,7 @@ export default class Wallet implements IWallet<StateType> {
 
     this.subscribe((account: AccountType) => {
       if (walletState.accounts) {
-        walletState.accounts[activeWalletId!][activeNetwork!] = [account]
+        walletState.accounts[activeWalletId!][activeNetwork!].push(account)
       }
       Object.assign(walletState.fiatRates, account.fiatRates)
 

@@ -1,5 +1,5 @@
 import { AccountType, Hardware, IAccount, IAsset, IConfig, Mnemonic, NetworkEnum, StateType } from '../types'
-import { ChainId, chains } from '@liquality/cryptoassets'
+import { ChainId, chains, assets as cryptoassets } from '@liquality/cryptoassets'
 import { Client } from '@liquality/client'
 import { Address, BigNumber, bitcoin, FeeDetails } from '@liquality/types'
 import Asset from '../asset'
@@ -8,7 +8,6 @@ import { BitcoinEsploraBatchApiProvider } from '@liquality/bitcoin-esplora-batch
 import { BitcoinJsWalletProvider } from '@liquality/bitcoin-js-wallet-provider'
 import { BitcoinRpcFeeProvider } from '@liquality/bitcoin-rpc-fee-provider'
 import { BitcoinFeeApiProvider } from '@liquality/bitcoin-fee-api-provider'
-import { BitcoinNetwork } from '@liquality/bitcoin-networks'
 
 const ASSET = 'BTC'
 
@@ -54,7 +53,9 @@ export default class BitcoinAccount implements IAccount {
   }
 
   public async build(): Promise<AccountType> {
-    await this.getUnusedAddress()
+    if (!this._address) {
+      await this.getUnusedAddress()
+    }
     await this.getAssets()
 
     return this.toAccount()
@@ -73,7 +74,8 @@ export default class BitcoinAccount implements IAccount {
 
   public getAssets(): Promise<IAsset[]> {
     if (this._assets.length > 0) return Promise.resolve(this._assets)
-    return Promise.resolve([new Asset(ASSET, this._address, this._client)])
+    this._assets.push(new Asset(ASSET, this._address, this._client))
+    return Promise.resolve(this._assets)
   }
 
   public async getUnusedAddress(): Promise<Address> {
@@ -94,11 +96,11 @@ export default class BitcoinAccount implements IAccount {
     return await this._client.chain.getFees()
   }
 
-  getPrivateKey(): Promise<string> {
+  public getPrivateKey(): Promise<string> {
     return Promise.resolve('')
   }
 
-  getPublicKey(): Promise<string> {
+  public getPublicKey(): Promise<string> {
     return Promise.resolve('')
   }
 
@@ -107,11 +109,17 @@ export default class BitcoinAccount implements IAccount {
   }
 
   public async fetchPricesForAssets(toCurrency: string): Promise<StateType['fiatRates']> {
-    const requestUrl = `${this._config.getPriceFetcherUrl()}/simple/price?ids=BTC&vs_currencies=${toCurrency}`
-    const { data } = await axios.get(requestUrl)
+    const baseCurrency = cryptoassets[ASSET]?.coinGeckoId
+    if (!baseCurrency) {
+      throw new Error('asset not supported')
+    }
+
+    const { data } = await axios.get(`${this._config.getPriceFetcherUrl()}/simple/price`, {
+      params: { vs_currencies: toCurrency, ids: baseCurrency }
+    })
 
     return {
-      BTC: data[data.coinGeckoId][toCurrency.toLowerCase()]
+      BTC: data[baseCurrency][toCurrency.toLowerCase()]
     }
   }
 
@@ -124,7 +132,7 @@ export default class BitcoinAccount implements IAccount {
       assets: [ASSET],
       addresses: [this._address.address],
       balances: {
-        [ASSET]: (await this._assets[0].getBalance()).toNumber()
+        [ASSET]: (await this.getBalance()).toNumber()
       },
       fiatRates: await this.fetchPricesForAssets('usd'),
       feeDetails: await this.getFeeDetails(),
@@ -150,12 +158,7 @@ export default class BitcoinAccount implements IAccount {
       })
     )
 
-    const options: {
-      network: BitcoinNetwork
-      mnemonic: string
-      baseDerivationPath: string
-      addressType?: bitcoin.AddressType
-    } = {
+    const options = {
       network: bitcoinNetwork,
       mnemonic: this._mnemonic,
       baseDerivationPath: this._derivationPath,
@@ -169,7 +172,7 @@ export default class BitcoinAccount implements IAccount {
     if (isTestnet) {
       btcClient.addProvider(new BitcoinRpcFeeProvider())
     } else {
-      btcClient.addProvider(new BitcoinFeeApiProvider('https://liquality.io/swap/mempool/v1/fees/recommended'))
+      btcClient.addProvider(new BitcoinFeeApiProvider(this._config.getBitcoinFeeUrl()))
     }
 
     return btcClient

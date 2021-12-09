@@ -1,7 +1,4 @@
 {
-  "env": {
-    "jest": true
-  },
   "root": true,
   "parser": "@typescript-eslint/parser",
   "plugins": ["@typescript-eslint", "prettier"],

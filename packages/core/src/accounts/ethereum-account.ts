@@ -1,5 +1,5 @@
 import { AccountType, Hardware, IAccount, IAsset, IConfig, Mnemonic, StateType } from '../types'
-import { ChainId, assets as cryptoassets, chains } from '@liquality/cryptoassets'
+import { ChainId, assets as cryptoassets, chains, isEthereumChain } from '@liquality/cryptoassets'
 import { NetworkEnum } from '../types'
 import { Client } from '@liquality/client'
 import { Address, BigNumber, FeeDetails } from '@liquality/types'
@@ -153,37 +153,22 @@ export default class EthereumAccount implements IAccount {
 
   public async fetchPricesForAssets(toCurrency: string): Promise<StateType['fiatRates']> {
     const baseCurrencies = this._config.getDefaultEnabledAssets(this._network)
+    const reverseMap: Record<string, string> = {}
     const coindIds = baseCurrencies
-      .filter((currency) => cryptoassets[currency]?.coinGeckoId)
-      .map((currency) => cryptoassets[currency].coinGeckoId)
-    const requestUrl = `${this._config.getPriceFetcherUrl()}/simple/price?ids=${coindIds.join(
-      ','
-    )}&vs_currencies=${toCurrency}`
-    const { data } = await axios.get(requestUrl)
-
-    const prices = Object.keys(data).reduce((acc: any, coinGeckoId) => {
-      const asset = Object.entries(cryptoassets).find((entry) => {
-        return entry[1].coinGeckoId === coinGeckoId
+      .filter((currency) => cryptoassets[currency]?.coinGeckoId && isEthereumChain(cryptoassets[currency].chain))
+      .map((currency) => {
+        reverseMap[cryptoassets[currency].coinGeckoId] = currency
+        return cryptoassets[currency].coinGeckoId
       })
-      if (asset) {
-        acc[asset[0]] = {
-          [toCurrency.toUpperCase()]: data[coinGeckoId][toCurrency.toLowerCase()]
-        }
-      }
-
+    const { data } = await axios.get(`${this._config.getPriceFetcherUrl()}/simple/price`, {
+      params: { vs_currencies: toCurrency, ids: coindIds.join(',') }
+    })
+    const prices = Object.keys(data).reduce((acc: Record<string, number>, coinGeckoId) => {
+      acc[reverseMap[coinGeckoId]] = data[coinGeckoId][toCurrency.toLowerCase()]
       return acc
     }, {})
 
-    for (const baseCurrency of baseCurrencies) {
-      if (!prices[baseCurrency] && cryptoassets[baseCurrency].matchingAsset) {
-        prices[baseCurrency] = prices[cryptoassets[baseCurrency].matchingAsset]
-      }
-    }
-
-    return Object.keys(prices).reduce((acc: any, assetName) => {
-      acc[assetName] = prices[assetName][toCurrency.toUpperCase()]
-      return acc
-    }, {})
+    return prices
   }
 
   public async refresh(): Promise<AccountType> {

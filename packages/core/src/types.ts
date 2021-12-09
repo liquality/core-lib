@@ -63,11 +63,13 @@ export interface IConfig {
   getBitcoinTestnet(): string
   getBatchEsploraAPIUrl(network: NetworkEnum): string
   getChainNetwork(chain: ChainId, network: NetworkEnum): BitcoinNetwork & EthereumNetwork
-  getDefaultEnabledChains(network: NetworkEnum)
+  getDefaultEnabledChains(network: NetworkEnum): ChainId[]
   getDefaultEnabledAssets(network: NetworkEnum): string[]
   getPriceFetcherUrl(): string
   getDefaultNetwork(): NetworkEnum
+  getChainColor(chain: ChainId): string
   isDarkMode(): boolean
+  getBitcoinFeeUrl(): string
 }
 
 export interface IWalletConstructor<T> {

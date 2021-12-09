@@ -16,6 +16,16 @@ export const ChainNetworks: Partial<ChainNetworkType> = {
   }
 }
 
+const chainDefaultColors: Partial<Record<ChainId, string>> = {
+  bitcoin: '#EAB300',
+  ethereum: '#4F67E4',
+  rsk: '#3AB24D',
+  bsc: '#F7CA4F',
+  near: '#000000',
+  polygon: '#8247E5',
+  arbitrum: '#28A0EF'
+}
+
 const DefaultAssets: Record<NetworkEnum, string[]> = {
   mainnet: [
     'BTC',
@@ -65,7 +75,7 @@ const DefaultNetwork = NetworkEnum.Testnet
 const IS_DARK_MODE = false
 
 export class Config implements IConfig {
-  private _infuraAPIKey: string
+  private readonly _infuraAPIKey: string
 
   constructor(infuraAPIKey?) {
     this._infuraAPIKey = infuraAPIKey
@@ -95,7 +105,7 @@ export class Config implements IConfig {
     return ChainNetworks[chain][network]
   }
 
-  public getDefaultEnabledChains(network: NetworkEnum) {
+  public getDefaultEnabledChains(network: NetworkEnum): ChainId[] {
     return DefaultChains[network]
   }
 
@@ -103,7 +113,7 @@ export class Config implements IConfig {
     return DefaultAssets[network]
   }
 
-  public getPriceFetcherUrl() {
+  public getPriceFetcherUrl(): string {
     return COIN_GECKO_API
   }
 
@@ -111,66 +121,15 @@ export class Config implements IConfig {
     return DefaultNetwork
   }
 
+  public getChainColor(chain: ChainId): string {
+    return chainDefaultColors[chain]
+  }
+
   public isDarkMode(): boolean {
     return IS_DARK_MODE
   }
-}
 
-export const accountColors = [
-  '#000000',
-  '#1CE5C3',
-  '#007AFF',
-  '#4F67E4',
-  '#9D4DFA',
-  '#D421EB',
-  '#FF287D',
-  '#FE7F6B',
-  '#EAB300',
-  '#F7CA4F',
-  '#A1E44A',
-  '#3AB24D',
-  '#8247E5'
-]
-
-export const chainDefaultColors: Partial<Record<ChainId, string>> = {
-  bitcoin: '#EAB300',
-  ethereum: '#4F67E4',
-  rsk: '#3AB24D',
-  bsc: '#F7CA4F',
-  near: '#000000',
-  polygon: '#8247E5',
-  arbitrum: '#28A0EF'
-}
-
-export default {
-  defaultAssets: {
-    mainnet: [
-      'BTC',
-      'ETH',
-      'DAI',
-      'USDC',
-      'USDT',
-      'WBTC',
-      'UNI',
-      'RBTC',
-      'SOV',
-      'BNB',
-      'NEAR',
-      'MATIC',
-      'PWETH',
-      'ARBETH'
-    ],
-    testnet: ['BTC', 'ETH', 'DAI', 'RBTC', 'BNB', 'NEAR', 'SOV', 'MATIC', 'PWETH', 'ARBETH']
-  } as Record<NetworkEnum, string[]>,
-  infuraApiKey: 'da99ebc8c0964bb8bb757b6f8cc40f1f',
-  exploraApis: {
-    testnet: 'https://liquality.io/testnet/electrs',
-    mainnet: 'https://api-mainnet-bitcoin-electrs.liquality.io'
-  },
-  batchEsploraApis: {
-    testnet: 'https://liquality.io/electrs-testnet-batch',
-    mainnet: 'https://api-mainnet-bitcoin-electrs-batch.liquality.io'
-  },
-  networks: ['mainnet', 'testnet'] as NetworkEnum[],
-  chains: ['bitcoin', 'ethereum', 'rsk', 'bsc', 'near', 'polygon', 'arbitrum'] as ChainId[]
+  public getBitcoinFeeUrl(): string {
+    return 'https://liquality.io/swap/mempool/v1/fees/recommended'
+  }
 }
