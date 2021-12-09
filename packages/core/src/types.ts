@@ -68,7 +68,6 @@ export interface IConfig {
   getPriceFetcherUrl(): string
   getDefaultNetwork(): NetworkEnum
   getChainColor(chain: ChainId): string
-  isDarkMode(): boolean
   getBitcoinFeeUrl(): string
 }
 

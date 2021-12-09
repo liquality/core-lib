@@ -71,9 +71,6 @@ const batchEsploraApis = {
 }
 
 const DefaultNetwork = NetworkEnum.Testnet
-
-const IS_DARK_MODE = false
-
 export class Config implements IConfig {
   private readonly _infuraAPIKey: string
 
@@ -123,10 +120,6 @@ export class Config implements IConfig {
 
   public getChainColor(chain: ChainId): string {
     return chainDefaultColors[chain]
-  }
-
-  public isDarkMode(): boolean {
-    return IS_DARK_MODE
   }
 
   public getBitcoinFeeUrl(): string {
