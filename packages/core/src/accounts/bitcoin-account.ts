@@ -2,7 +2,6 @@ import { AccountType, Hardware, IAccount, IAsset, IConfig, Mnemonic, NetworkEnum
 import { ChainId, chains, assets as cryptoassets } from '@liquality/cryptoassets'
 import { Client } from '@liquality/client'
 import { Address, BigNumber, bitcoin, FeeDetails } from '@liquality/types'
-import Asset from '../asset'
 import axios from 'axios'
 import { BitcoinEsploraBatchApiProvider } from '@liquality/bitcoin-esplora-batch-api-provider'
 import { BitcoinJsWalletProvider } from '@liquality/bitcoin-js-wallet-provider'
@@ -56,7 +55,6 @@ export default class BitcoinAccount implements IAccount {
     if (!this._address) {
       await this.getUsedAddress()
     }
-    await this.getAssets()
 
     return this.toAccount()
   }
@@ -73,10 +71,7 @@ export default class BitcoinAccount implements IAccount {
   }
 
   public getAssets(): Promise<IAsset[]> {
-    if (this._assets.length > 0) return Promise.resolve(this._assets)
-    if (!this._address) this.getUsedAddress()
-    this._assets.push(new Asset(ASSET, this._address.address, this._client))
-    return Promise.resolve(this._assets)
+    return Promise.resolve([])
   }
 
   public async getUnusedAddress(): Promise<Address> {
@@ -134,7 +129,7 @@ export default class BitcoinAccount implements IAccount {
       chain: this._chain,
       type: 'default',
       index: 0,
-      assets: [ASSET],
+      assets: [],
       addresses: [this._address.address],
       balances: {
         [ASSET]: (await this.getBalance()).toNumber()
