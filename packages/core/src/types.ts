@@ -69,6 +69,8 @@ export interface IConfig {
   getDefaultNetwork(): NetworkEnum
   getChainColor(chain: ChainId): string
   getBitcoinFeeUrl(): string
+  getTestnetContractAddress(assetSymbol: string): string
+  getSovereignRPCAPIUrl(network: NetworkEnum): string
 }
 
 export interface IWalletConstructor<T> {
@@ -174,7 +176,7 @@ export interface IAccount {
   calculateDerivationPath(): string
   getAssets(): Promise<IAsset[]>
   getUnusedAddress(): Promise<Address>
-  getUsedAddress(): Address
+  getUsedAddress(): Promise<Address>
   getPublicKey(): Promise<string>
   getPrivateKey(): Promise<string>
   getBalance(): Promise<BigNumber>

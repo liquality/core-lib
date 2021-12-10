@@ -4,15 +4,13 @@ import { NetworkEnum } from '../types'
 import { Client } from '@liquality/client'
 import { Address, BigNumber, FeeDetails } from '@liquality/types'
 import { EthereumRpcFeeProvider } from '@liquality/ethereum-rpc-fee-provider'
-import { EthereumGasNowFeeProvider } from '@liquality/ethereum-gas-now-fee-provider'
-import { EthereumNetwork } from '@liquality/ethereum-networks'
 import { EthereumRpcProvider } from '@liquality/ethereum-rpc-provider'
 import { EthereumJsWalletProvider } from '@liquality/ethereum-js-wallet-provider'
 import Asset from '../asset'
 import { EthereumErc20Provider } from '@liquality/ethereum-erc20-provider'
 import axios from 'axios'
 
-export default class EthereumAccount implements IAccount {
+export default class RSKAccount implements IAccount {
   private _mnemonic: Mnemonic
   private _index: number
   private _name: string
@@ -40,11 +38,6 @@ export default class EthereumAccount implements IAccount {
       throw new Error('Unable to generate address. Mnemonic missing')
     }
 
-    const isTestnet = network === NetworkEnum.Testnet
-    const ethereumNetwork = config.getChainNetwork(chain, network)
-    const infuraApi = isTestnet ? config.getEthereumTestnet() : config.getEthereumMainnet()
-    const feeProvider = isTestnet ? new EthereumRpcFeeProvider() : new EthereumGasNowFeeProvider()
-
     this._config = config
     this._mnemonic = mnemonic
     this._index = index
@@ -55,13 +48,7 @@ export default class EthereumAccount implements IAccount {
     this._at = Date.now()
     this._assets = []
     this._derivationPath = this.calculateDerivationPath()
-    this._client = this.createEthereumClient(
-      ethereumNetwork as EthereumNetwork,
-      infuraApi,
-      feeProvider,
-      this._mnemonic,
-      this._derivationPath
-    )
+    this._client = this.createEthereumClient()
   }
 
   public async build(): Promise<AccountType> {
@@ -97,27 +84,18 @@ export default class EthereumAccount implements IAccount {
   }
 
   public async getAssets(): Promise<IAsset[]> {
-    if (!this._address) this.getUsedAddress()
-    const isTestnet = this._network === NetworkEnum.Testnet
-    const ethereumNetwork = this._config.getChainNetwork(this._chain, this._network)
-    const infuraApi = isTestnet ? this._config.getEthereumTestnet() : this._config.getEthereumMainnet()
-    const feeProvider = isTestnet ? new EthereumRpcFeeProvider() : new EthereumGasNowFeeProvider()
-
     const _assetSymbols = this._config.getDefaultEnabledAssets(this._network)
+    if (!this._address) this.getUsedAddress()
     return (this._assets = _assetSymbols
       .filter((asset) => {
         return cryptoassets[asset]?.chain === this._chain
       })
       .map((asset) => {
-        const client = this.createEthereumClient(
-          ethereumNetwork as EthereumNetwork,
-          infuraApi,
-          feeProvider,
-          this._mnemonic,
-          this._derivationPath,
-          asset
-        )
-        return new Asset(asset, this._address.address, client)
+        if (asset && cryptoassets[asset]?.type === 'erc20') {
+          const client = this.createEthereumClient(asset)
+          return new Asset(asset, this._address.address, client)
+        }
+        return new Asset(asset, this._address.address, this._client)
       }))
   }
 
@@ -203,27 +181,27 @@ export default class EthereumAccount implements IAccount {
     }
   }
 
-  private createEthereumClient(
-    ethereumNetwork: EthereumNetwork,
-    rpcApi: string,
-    feeProvider: EthereumRpcFeeProvider | EthereumGasNowFeeProvider,
-    mnemonic: string,
-    derivationPath: string,
-    asset?: string
-  ) {
+  private createEthereumClient(asset?: string) {
+    const isTestnet = this._network === 'testnet'
+    const rskNetwork = this._config.getChainNetwork(this._chain, this._network)
+    const rpcApi = this._config.getSovereignRPCAPIUrl(this._network)
+    const feeProvider = new EthereumRpcFeeProvider({ slowMultiplier: 1, averageMultiplier: 1, fastMultiplier: 1.25 })
     const ethClient = new Client()
+
     ethClient.addProvider(new EthereumRpcProvider({ uri: rpcApi }))
 
     ethClient.addProvider(
       new EthereumJsWalletProvider({
-        network: ethereumNetwork,
-        mnemonic,
-        derivationPath
+        network: rskNetwork,
+        mnemonic: this._mnemonic,
+        derivationPath: this._derivationPath
       })
     )
 
     if (asset && cryptoassets[asset]?.type === 'erc20') {
-      const contractAddress = cryptoassets[asset].contractAddress
+      const contractAddress = isTestnet
+        ? this._config.getTestnetContractAddress(asset)
+        : cryptoassets[asset].contractAddress
       ethClient.addProvider(new EthereumErc20Provider(contractAddress))
     }
 

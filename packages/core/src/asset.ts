@@ -1,5 +1,5 @@
 import { IAsset, Token } from './types'
-import { Address, BigNumber, SendOptions, Transaction } from '@liquality/types'
+import { BigNumber, SendOptions, Transaction } from '@liquality/types'
 import { Client } from '@liquality/client'
 import { isEthereumChain, assets as cryptoassets } from '@liquality/cryptoassets'
 
@@ -7,17 +7,17 @@ export default class Asset implements IAsset {
   _balance: BigNumber
   _symbol: string
   _type: Token
-  _addressObject: Address
+  _address: string
   _client: Client
 
-  constructor(symbol: string, addressObject: Address, client: Client) {
+  constructor(symbol: string, address: string, client: Client) {
     this._symbol = symbol
-    this._addressObject = addressObject
+    this._address = address
     this._client = client
   }
 
   public getAddress(): string {
-    return this._addressObject.address
+    return this._address
   }
 
   getSymbol(): string {
@@ -25,9 +25,7 @@ export default class Asset implements IAsset {
   }
 
   public async getBalance(): Promise<BigNumber> {
-    const address = isEthereumChain(cryptoassets[this._symbol].chain)
-      ? this._addressObject.address.replace('0x', '')
-      : this._addressObject.address // TODO: Should not require removing 0x
+    const address = isEthereumChain(cryptoassets[this._symbol].chain) ? this._address.replace('0x', '') : this._address // TODO: Should not require removing 0x
     return await this._client.chain.getBalance([address])
   }
 

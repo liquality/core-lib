@@ -18,6 +18,7 @@ import { v4 as uuidv4 } from 'uuid'
 import EthereumAccount from './accounts/ethereum-account'
 import BitcoinAccount from './accounts/bitcoin-account'
 import axios from 'axios'
+import RSKAccount from './accounts/rsk-account'
 
 export default class Wallet implements IWallet<StateType> {
   private SALT_BYTE_COUNT = 32
@@ -166,8 +167,9 @@ export default class Wallet implements IWallet<StateType> {
     const accountKey = `${chain}-${network}`
     if (this._accounts[accountKey]) return this._accounts[accountKey]
     const account: IAccount = this.accountFactory(this._config, this._mnemonic, 0, chain, network, [])
+    const walletAccount = await account.build()
     this._accounts[accountKey] = account
-    if (this._callback) this._callback(await account.build())
+    if (this._callback) this._callback(walletAccount)
     return account
   }
 
@@ -258,9 +260,11 @@ export default class Wallet implements IWallet<StateType> {
   ) {
     switch (chain) {
       case ChainId.Ethereum:
-        return new EthereumAccount(config, mnemonic, 0, chain, network, assets)
+        return new EthereumAccount(config, mnemonic, index, chain, network, assets)
       case ChainId.Bitcoin:
-        return new BitcoinAccount(config, mnemonic, 0, chain, network, assets)
+        return new BitcoinAccount(config, mnemonic, index, chain, network, assets)
+      case ChainId.Rootstock:
+        return new RSKAccount(config, mnemonic, index, chain, network, assets)
     }
   }
 }

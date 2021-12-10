@@ -54,7 +54,7 @@ export default class BitcoinAccount implements IAccount {
 
   public async build(): Promise<AccountType> {
     if (!this._address) {
-      await this.getUnusedAddress()
+      await this.getUsedAddress()
     }
     await this.getAssets()
 
@@ -74,7 +74,8 @@ export default class BitcoinAccount implements IAccount {
 
   public getAssets(): Promise<IAsset[]> {
     if (this._assets.length > 0) return Promise.resolve(this._assets)
-    this._assets.push(new Asset(ASSET, this._address, this._client))
+    if (!this._address) this.getUsedAddress()
+    this._assets.push(new Asset(ASSET, this._address.address, this._client))
     return Promise.resolve(this._assets)
   }
 
@@ -83,13 +84,17 @@ export default class BitcoinAccount implements IAccount {
     return (this._address = await this._client.wallet.getUnusedAddress())
   }
 
-  public getUsedAddress(): Address {
+  public async getUsedAddress(): Promise<Address> {
+    if (this._address) return this._address
+    const addresses = await this._client.wallet.getUsedAddresses(100)
+    if (addresses.length == 0) throw new Error('No addresses found')
+    this._address = addresses[0]
     return this._address
   }
 
   public async getBalance(): Promise<BigNumber> {
-    if (!this._address) await this.getUnusedAddress()
-    return await this._client.chain.getBalance([this._address])
+    const addresses = await this._client.wallet.getUsedAddresses(100)
+    return await this._client.chain.getBalance(addresses)
   }
 
   public async getFeeDetails(): Promise<FeeDetails> {
