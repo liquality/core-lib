@@ -6,6 +6,7 @@
     "sourceMap": true,
     "importHelpers": true,
     "lib": ["ES2017"],
+    "jsx": "react",
     "outDir": "./dist"
   },
   "include": ["./src"]

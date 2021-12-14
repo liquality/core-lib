@@ -12,8 +12,13 @@
     "dist",
     "src"
   ],
-  "scripts": {
-    "build": "tsc",
-    "test": "echo \"Error: run tests from root\" && exit 1"
+  "devDependencies": {
+    "docz": "2.3.1"
+  },
+  "resolutions": {
+    "remark-mdx": "1.6.22"
+  },
+  "dependencies": {
+    "tslib": "^2.3.1"
   }
 }
