@@ -9,5 +9,5 @@
     "@typescript-eslint/ban-ts-comment": "off",
     "@typescript-eslint/no-unused-vars": ["error", { "args": "after-used", "ignoreRestSiblings": true }]
   },
-  "ignorePatterns": ["packages/*/lib/**/*"]
+  "ignorePatterns": ["packages/*/dist/**/*"]
 }
