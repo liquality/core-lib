@@ -104,7 +104,7 @@ export default class EthereumAccount implements IAccount {
     const feeProvider = isTestnet ? new EthereumRpcFeeProvider() : new EthereumGasNowFeeProvider()
 
     const _assetSymbols = this._config.getDefaultEnabledAssets(this._network)
-    return (this._assets = _assetSymbols
+    this._assets = _assetSymbols
       .filter((asset) => {
         return cryptoassets[asset]?.chain === this._chain
       })
@@ -118,7 +118,8 @@ export default class EthereumAccount implements IAccount {
           asset
         )
         return new Asset(asset, this._address.address, client)
-      }))
+      })
+    return this._assets
   }
 
   public getPrivateKey(): Promise<string> {

@@ -86,7 +86,7 @@ export default class RSKAccount implements IAccount {
   public async getAssets(): Promise<IAsset[]> {
     const _assetSymbols = this._config.getDefaultEnabledAssets(this._network)
     if (!this._address) this.getUsedAddress()
-    return (this._assets = _assetSymbols
+    this._assets = _assetSymbols
       .filter((asset) => {
         return cryptoassets[asset]?.chain === this._chain
       })
@@ -96,7 +96,8 @@ export default class RSKAccount implements IAccount {
           return new Asset(asset, this._address.address, client)
         }
         return new Asset(asset, this._address.address, this._client)
-      }))
+      })
+    return this._assets
   }
 
   public getPrivateKey(): Promise<string> {
