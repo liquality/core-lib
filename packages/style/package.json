@@ -1,7 +1,7 @@
 {
-  "name": "@liquality/interface",
+  "name": "@liquality/style",
   "version": "0.0.2",
-  "description": "> TODO: description",
+  "description": "Liquality Style library",
   "author": "b0b <b0b@liquality.io>",
   "main": "dist/index.js",
   "directories": {
