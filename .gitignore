@@ -1,5 +1,8 @@
 node_modules/
 dist/
+./**/dist
 .DS_Store
 lerna-debug.log
 .eslintcache
+./**/.env
+.idea

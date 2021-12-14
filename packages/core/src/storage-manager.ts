@@ -1,4 +1,4 @@
-import { StateType, StorageManagerI } from './types'
+import { IStorage, StateType } from './types'
 
 type AsyncStorage = {
   setItem(key: string, value: string): Promise<void>
@@ -9,7 +9,7 @@ export default function mkStorageManager(AsyncStorage: AsyncStorage) {
   /**
    * Implementation of the StorageManagerI interface for mobile
    */
-  return class StorageManager implements StorageManagerI<StateType> {
+  return class StorageManager implements IStorage<StateType> {
     excludedProps: Array<keyof StateType>
     storageKey: string
 
@@ -18,7 +18,7 @@ export default function mkStorageManager(AsyncStorage: AsyncStorage) {
       this.excludedProps = excludedProps
     }
 
-    public async persist(data: StateType): Promise<boolean | Error> {
+    public async write(data: StateType): Promise<boolean | Error> {
       if (!data || Object.keys(data).length === 0) {
         return new Error('Empty data')
       }

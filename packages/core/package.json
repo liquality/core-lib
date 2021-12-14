@@ -33,6 +33,7 @@
     "@liquality/ethereum-networks": "^1.9.1",
     "@liquality/ethereum-rpc-fee-provider": "^1.9.1",
     "@liquality/ethereum-rpc-provider": "^1.9.1",
+    "@liquality/ethereum-erc20-provider": "^1.9.1",
     "@liquality/types": "^1.9.1",
     "axios": "^0.24.0",
     "bip39": "^3.0.4",

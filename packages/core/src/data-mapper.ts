@@ -1,21 +1,21 @@
-import { DataMapperI, FlatState, StateType } from './types'
+import { IDataMapper, FlatState, StateType } from './types'
 import BigNumber from 'bignumber.js'
 import { assets as cryptoassets, unitToCurrency } from '@liquality/cryptoassets'
 
 /**
  * A class that converts raw state to computed state to abstract the complexity from the UI
  */
-export default class DataMapper implements DataMapperI<StateType, FlatState> {
+// TODO use this class for object transformations
+export default class DataMapper implements IDataMapper<StateType, FlatState> {
   state: StateType
   totalBalance: BigNumber = new BigNumber(0)
   assetCount = 0
 
   constructor(state: StateType) {
     this.state = state
-    this.process()
   }
 
-  public process(): DataMapper {
+  public marshall(): FlatState {
     let totalBalance = new BigNumber(0)
     let assetCounter = 0
     const { activeWalletId, activeNetwork, accounts, fiatRates } = this.state
@@ -43,14 +43,18 @@ export default class DataMapper implements DataMapperI<StateType, FlatState> {
     this.assetCount = assetCounter
     this.totalBalance = totalBalance
 
-    return this
+    return {
+      assetCount: assetCounter,
+      totalBalance: totalBalance,
+      totalBalanceInFiat: totalBalance
+    }
   }
 
   public toJson(): FlatState {
     return {
       assetCount: this.assetCount,
-      totalBalance: this.totalBalance.toNumber(),
-      totalBalanceInFiat: this.totalBalance.toNumber()
+      totalBalance: this.totalBalance,
+      totalBalanceInFiat: this.totalBalance
     }
   }
 }
