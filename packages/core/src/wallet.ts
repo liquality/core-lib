@@ -213,7 +213,7 @@ export default class Wallet implements IWallet<StateType> {
     )}&vs_currencies=${toCurrency}`
     const { data } = await axios.get(requestUrl)
 
-    const prices = Object.keys(data).reduce((acc: any, coinGeckoId) => {
+    const prices = Object.keys(data).reduce((acc: Record<string, Record<string, number>>, coinGeckoId) => {
       const asset = Object.entries(cryptoassets).find((entry) => {
         return entry[1].coinGeckoId === coinGeckoId
       })
@@ -232,7 +232,7 @@ export default class Wallet implements IWallet<StateType> {
       }
     }
 
-    return Object.keys(prices).reduce((acc: any, assetName) => {
+    return Object.keys(prices).reduce((acc: Record<string, number>, assetName) => {
       acc[assetName] = prices[assetName][toCurrency.toUpperCase()]
       return acc
     }, {})
