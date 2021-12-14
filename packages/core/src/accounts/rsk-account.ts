@@ -108,8 +108,7 @@ export default class RSKAccount implements IAccount {
   }
 
   public async getUnusedAddress(): Promise<Address> {
-    if (this._address) return Promise.resolve(this._address)
-    return (this._address = await this._client.wallet.getUnusedAddress())
+    return await this._client.wallet.getUnusedAddress()
   }
 
   public async getUsedAddress(): Promise<Address> {

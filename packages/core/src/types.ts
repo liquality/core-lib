@@ -173,23 +173,81 @@ export interface IAccount {
    *
    */
   build(): Promise<AccountType>
+
+  /**
+   * Computes the derivation path
+   */
   calculateDerivationPath(): string
+
+  /**
+   * Fetches all the assets belonging to the associated account.
+   * It only exposes the assets that are enabled in the Config object
+   */
   getAssets(): Promise<IAsset[]>
+
+  /**
+   * Fetches an address that has not seen any transactions
+   */
   getUnusedAddress(): Promise<Address>
+
+  /**
+   * Fetches the addresses that has seen some transactions and return the first one
+   */
   getUsedAddress(): Promise<Address>
+
+  /**
+   * Computes the public key of the current account
+   */
   getPublicKey(): Promise<string>
+
+  /**
+   * Computes the private key of the current account
+   */
   getPrivateKey(): Promise<string>
+
+  /**
+   * Fetches the balance associated with the current account address
+   */
   getBalance(): Promise<BigNumber>
+
+  /**
+   * Fetches fees for all assets associated with the current account
+   */
   getFeeDetails(): Promise<FeeDetails>
+
+  /**
+   * Fetches fiat rates for the assets associated with the current account
+   */
   fetchPricesForAssets(toCurrency: string): Promise<StateType['fiatRates']>
   refresh(): Promise<AccountType>
 }
 
 export interface IAsset {
+  /**
+   * Return the asset name.
+   */
   getSymbol(): string
+
+  /**
+   * Returns the address associated with the current asset
+   */
   getAddress(): string
+
+  /**
+   * Fetches the asset balance
+   */
   getBalance(): Promise<BigNumber>
+
+  /**
+   * Performs a transaction
+   * @param options the payload information necessary to perform the transaction
+   * @returns return a transaction object
+   */
   transmit(options: SendOptions): Promise<Transaction>
+
+  /**
+   * Fetches past transactions
+   */
   getPastTransactions(): Promise<Transaction[]>
 }
 
