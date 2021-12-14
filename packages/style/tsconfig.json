@@ -1,13 +1,15 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "rootDir": ".",
     "noEmit": false,
     "declaration": true,
     "sourceMap": true,
     "importHelpers": true,
-    "lib": ["ES2017"],
+    "lib": ["ES2017", "DOM"],
     "jsx": "react",
     "outDir": "./dist"
   },
+  "exclude": [".docz"],
   "include": ["./src"]
 }
