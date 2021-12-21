@@ -15,6 +15,7 @@
   "scripts": {
     "build": "tsc && docz build",
     "docz": "docz dev",
+    "pregh": "npm run build",
     "gh": "gh-pages -d .docz/dist",
     "test": "echo \"Error: run tests from root\" && exit 1"
   },
