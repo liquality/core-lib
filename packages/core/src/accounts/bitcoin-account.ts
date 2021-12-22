@@ -122,6 +122,10 @@ export default class BitcoinAccount implements IAccount {
     }
   }
 
+  public getClient(): Client {
+    return this._client
+  }
+
   private async toAccount(): Promise<AccountType> {
     return {
       name: `${chains[this._chain]?.name} 1`,

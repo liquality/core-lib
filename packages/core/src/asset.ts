@@ -36,4 +36,8 @@ export default class Asset implements IAsset {
   public async transmit(options: SendOptions): Promise<Transaction> {
     return await this._client.chain.sendTransaction(options)
   }
+
+  public getClient(): Client {
+    return this._client
+  }
 }

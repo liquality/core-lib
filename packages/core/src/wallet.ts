@@ -5,49 +5,69 @@ import {
   IAccount,
   IConfig,
   IEncryption,
-  InitialStateType,
   IStorage,
   IWallet,
   Mnemonic,
   NetworkEnum,
-  StateType
+  StateType,
+  SwapProvidersEnum,
+  ISwapProvider,
+  TriggerType
 } from './types'
-import { assets as cryptoassets, ChainId } from '@liquality/cryptoassets'
+import { ChainId } from '@liquality/cryptoassets'
 import { generateMnemonic, validateMnemonic } from 'bip39'
 import { v4 as uuidv4 } from 'uuid'
 import EthereumAccount from './accounts/ethereum-account'
 import BitcoinAccount from './accounts/bitcoin-account'
-import axios from 'axios'
 import RSKAccount from './accounts/rsk-account'
+import LiqualitySwapProvider from './swaps/liquality-swap-provider'
 
 export default class Wallet implements IWallet<StateType> {
   private SALT_BYTE_COUNT = 32
   private _storage: IStorage<StateType>
   private _encryption: IEncryption
   private _callback: (account: AccountType) => void
+  private _callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>
   private _config: IConfig
   private _accounts: AccountMapping
   private _mnemonic: Mnemonic
   private _password: string
+  private _activeNetwork: NetworkEnum
+  private _activeWalletId: string
+  private _swapProviders: Partial<Record<SwapProvidersEnum, ISwapProvider>>
 
   public constructor(storage: IStorage<StateType>, encryption: IEncryption, config: IConfig) {
     this._storage = storage
     this._encryption = encryption
     this._config = config
     this._accounts = {}
+    this._swapProviders = {}
+    this._callbacks = {}
   }
 
-  public init(password: string, mnemonic: Mnemonic): InitialStateType {
+  public async init(password: string, mnemonic: Mnemonic, imported: boolean): Promise<StateType> {
+    const walletId = uuidv4()
+    const keySalt = this._encryption.generateSalt(this.SALT_BYTE_COUNT)
     this._mnemonic = mnemonic
     this._password = password
-    const walletId = uuidv4()
+    this._activeNetwork = this._config.getDefaultNetwork()
 
-    return {
-      activeWalletId: walletId,
-      activeNetwork: this._config.getDefaultNetwork(),
-      name: 'Account-1',
-      at: Date.now(),
-      keySalt: this._encryption.generateSalt(this.SALT_BYTE_COUNT),
+    const walletState: StateType = {
+      wallets: [
+        {
+          id: walletId,
+          name: 'Account-1',
+          at: Date.now(),
+          assets: this._config.getDefaultEnabledAssets(this._activeNetwork),
+          activeNetwork: this._activeNetwork,
+          mnemonic,
+          imported
+        }
+      ],
+      activeWalletId: (this._activeWalletId = walletId),
+      activeNetwork: this._activeNetwork,
+      key: password,
+      keySalt,
       accounts: {
         [walletId]: {
           [NetworkEnum.Testnet]: [],
@@ -61,41 +81,30 @@ export default class Wallet implements IWallet<StateType> {
         [NetworkEnum.Mainnet]: {
           [walletId]: {}
         }
-      }
-    }
-  }
-
-  public async build(password: string, mnemonic: Mnemonic, imported: boolean): Promise<StateType> {
-    const initialState = this.init(password, mnemonic)
-    const { activeWalletId, name, keySalt, at, activeNetwork, accounts, fees } = initialState
-    const walletState: StateType = {
-      wallets: [
-        {
-          id: activeWalletId,
-          at,
-          name,
-          assets: this._config.getDefaultEnabledAssets(activeNetwork),
-          activeNetwork,
-          mnemonic,
-          imported
-        }
-      ],
-      activeWalletId,
-      activeNetwork,
-      key: password,
-      keySalt,
-      accounts,
-      fees,
+      },
       fiatRates: {},
       enabledAssets: {
         [NetworkEnum.Testnet]: {
-          [activeWalletId]: this._config.getDefaultEnabledAssets(NetworkEnum.Testnet)
+          [walletId]: this._config.getDefaultEnabledAssets(NetworkEnum.Testnet)
         },
         [NetworkEnum.Mainnet]: {
-          [activeWalletId]: this._config.getDefaultEnabledAssets(NetworkEnum.Mainnet)
+          [walletId]: this._config.getDefaultEnabledAssets(NetworkEnum.Mainnet)
         }
       }
     }
+
+    walletState.encryptedWallets = await this._encryption.encrypt(
+      JSON.stringify(walletState.wallets),
+      keySalt,
+      password
+    )
+
+    return walletState
+  }
+
+  public async build(password: string, mnemonic: Mnemonic, imported: boolean): Promise<StateType> {
+    const walletState = await this.init(password, mnemonic, imported)
+    const { activeWalletId, activeNetwork } = walletState
 
     this.subscribe((account: AccountType) => {
       if (walletState.accounts) {
@@ -110,12 +119,6 @@ export default class Wallet implements IWallet<StateType> {
 
     await this.addAccounts(activeNetwork)
 
-    walletState.encryptedWallets = await this._encryption.encrypt(
-      JSON.stringify(walletState.wallets),
-      keySalt,
-      password
-    )
-
     return walletState
   }
 
@@ -126,30 +129,27 @@ export default class Wallet implements IWallet<StateType> {
 
   public async restore(password?: string): Promise<StateType> {
     const walletState = await this._storage.read()
-    const { encryptedWallets, keySalt, activeWalletId, activeNetwork } = walletState
+    const { encryptedWallets, keySalt } = walletState
 
     if (!encryptedWallets || !keySalt) {
       throw new Error('Please import/create your wallet')
     }
 
     if (password) {
-      const decryptedWallets = await this._encryption.decrypt(encryptedWallets!, keySalt!, password)
+      const decryptedWallets = await this._encryption.decrypt(encryptedWallets, keySalt, password)
       if (!decryptedWallets) {
-        throw new Error('Password Invalid')
+        throw new Error('Password Invalid-> ' + decryptedWallets + ' - ' + keySalt + ' - ' + password)
       }
 
       const wallets = JSON.parse(decryptedWallets)
 
       if (!wallets || wallets.length === 0) {
-        throw new Error('Password Invalid')
+        throw new Error('Password Invalid - Wallets')
       }
 
       //recreate the wallet
       this._password = password
       this._mnemonic = wallets[0].mnemonic //TODO refactor once we start supporting multi-wallet
-      for (const acct of walletState.accounts[activeWalletId][activeNetwork]) {
-        await this.addAccount(acct.chain, activeNetwork)
-      }
 
       return {
         ...walletState,
@@ -194,6 +194,10 @@ export default class Wallet implements IWallet<StateType> {
     this._callback = callback
   }
 
+  public on(trigger: TriggerType, callback: (...args: unknown[]) => void) {
+    this._callbacks[trigger] = callback
+  }
+
   public async refresh() {
     for (const account of Object.values(this._accounts)) {
       const result = await account.refresh()
@@ -201,41 +205,17 @@ export default class Wallet implements IWallet<StateType> {
     }
   }
 
-  public async fetchPricesForAssets(
-    baseCurrencies: Array<string>,
-    toCurrency: string
-  ): Promise<StateType['fiatRates']> {
-    const coindIds = baseCurrencies
-      .filter((currency) => cryptoassets[currency]?.coinGeckoId)
-      .map((currency) => cryptoassets[currency].coinGeckoId)
-    const requestUrl = `${this._config.getPriceFetcherUrl()}/simple/price?ids=${coindIds.join(
-      ','
-    )}&vs_currencies=${toCurrency}`
-    const { data } = await axios.get(requestUrl)
+  public getSwapProvider(swapProviderType: SwapProvidersEnum): ISwapProvider {
+    if (this._swapProviders[swapProviderType]) return this._swapProviders[swapProviderType]
 
-    const prices = Object.keys(data).reduce((acc: any, coinGeckoId) => {
-      const asset = Object.entries(cryptoassets).find((entry) => {
-        return entry[1].coinGeckoId === coinGeckoId
-      })
-      if (asset) {
-        acc[asset[0]] = {
-          [toCurrency.toUpperCase()]: data[coinGeckoId][toCurrency.toLowerCase()]
-        }
-      }
+    this._swapProviders[swapProviderType] = new LiqualitySwapProvider(
+      this._config,
+      this._activeNetwork,
+      this._activeWalletId,
+      this._callbacks
+    )
 
-      return acc
-    }, {})
-
-    for (const baseCurrency of baseCurrencies) {
-      if (!prices[baseCurrency] && cryptoassets[baseCurrency].matchingAsset) {
-        prices[baseCurrency] = prices[cryptoassets[baseCurrency].matchingAsset]
-      }
-    }
-
-    return Object.keys(prices).reduce((acc: any, assetName) => {
-      acc[assetName] = prices[assetName][toCurrency.toUpperCase()]
-      return acc
-    }, {})
+    return this._swapProviders[swapProviderType]
   }
 
   public async isNewInstallation(): Promise<boolean> {

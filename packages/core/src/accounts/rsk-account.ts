@@ -181,6 +181,10 @@ export default class RSKAccount implements IAccount {
     }
   }
 
+  public getClient(): Client {
+    return this._client
+  }
+
   private createEthereumClient(asset?: string) {
     const isTestnet = this._network === 'testnet'
     const rskNetwork = this._config.getChainNetwork(this._chain, this._network)

@@ -3,7 +3,8 @@
     "noEmit": true,
     "esModuleInterop": true,
     "module": "commonjs",
-    "target": "ES6"
+    "target": "ES6",
+    "resolveJsonModule": true
   },
   "exclude": ["node_modules", "__tests__"]
 }

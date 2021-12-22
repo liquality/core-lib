@@ -1,7 +1,9 @@
-import { ChainNetworkType, IConfig, NetworkEnum } from './types'
+import { ChainNetworkType, IConfig, NetworkEnum, SwapProvidersEnum, SwapProviderType } from './types'
 import { ChainId } from '@liquality/cryptoassets'
 import { BitcoinNetwork, BitcoinNetworks } from '@liquality/bitcoin-networks'
 import { EthereumNetwork, EthereumNetworks } from '@liquality/ethereum-networks'
+import SovrynMainnetAddresses from '@blobfishkate/sovryncontracts/contracts-mainnet.json'
+import SovrynTestnetAddresses from '@blobfishkate/sovryncontracts/contracts-testnet.json'
 
 const COIN_GECKO_API = 'https://api.coingecko.com/api/v3'
 
@@ -88,6 +90,48 @@ const sovereignApis: Record<NetworkEnum, string> = {
 }
 
 const DefaultNetwork = NetworkEnum.Testnet
+
+const swapProviders: Record<NetworkEnum, Partial<Record<SwapProvidersEnum, SwapProviderType>>> = {
+  [NetworkEnum.Testnet]: {
+    [SwapProvidersEnum.LIQUALITY]: {
+      name: 'Liquality',
+      icon: 'liquality.svg',
+      type: SwapProvidersEnum.LIQUALITY,
+      agent: process.env.AGENT_TESTNET_URL || 'https://liquality.io/swap-testnet-dev/agent'
+    },
+    [SwapProvidersEnum.SOVRYN]: {
+      name: 'Sovyrn',
+      icon: 'sovryn.svg',
+      type: SwapProvidersEnum.SOVRYN,
+      routerAddress: SovrynTestnetAddresses.swapNetwork,
+      routerAddressRBTC: SovrynTestnetAddresses.proxy3,
+      rpcURL: process.env.SOVRYN_RPC_URL_TESTNET
+    }
+  },
+  [NetworkEnum.Mainnet]: {
+    [SwapProvidersEnum.LIQUALITY]: {
+      name: 'Liquality',
+      icon: 'liquality.svg',
+      type: SwapProvidersEnum.LIQUALITY,
+      agent: 'https://liquality.io/swap-dev/agent'
+    },
+    [SwapProvidersEnum.LIQUALITYBOOST]: {
+      name: 'Liquality Boost',
+      type: SwapProvidersEnum.LIQUALITYBOOST,
+      network: 'mainnet',
+      icon: 'liqualityboost.svg',
+      supportedBridgeAssets: ['MATIC']
+    },
+    [SwapProvidersEnum.SOVRYN]: {
+      name: 'Sovyrn',
+      icon: 'sovryn.svg',
+      type: SwapProvidersEnum.SOVRYN,
+      routerAddress: SovrynMainnetAddresses.swapNetwork,
+      routerAddressRBTC: SovrynMainnetAddresses.proxy3,
+      rpcURL: process.env.SOVRYN_RPC_URL_MAINNET
+    }
+  }
+}
 export class Config implements IConfig {
   private readonly _infuraAPIKey: string
 
@@ -149,5 +193,13 @@ export class Config implements IConfig {
 
   public getSovereignRPCAPIUrl(network: NetworkEnum): string {
     return sovereignApis[network]
+  }
+
+  public getSwapProvider(network: NetworkEnum, providerId: string): SwapProviderType {
+    return swapProviders[network][providerId]
+  }
+
+  public getAgentUrl(network: NetworkEnum, provider: SwapProvidersEnum): string {
+    return swapProviders[network][provider].agent
   }
 }

@@ -11,10 +11,31 @@
 
 import { ChainId } from '@liquality/cryptoassets'
 import { Address, BigNumber, FeeDetails, SendOptions, Transaction } from '@liquality/types'
+import { Client } from '@liquality/client'
 import { BitcoinNetwork } from '@liquality/bitcoin-networks'
 import { EthereumNetwork } from '@liquality/ethereum-networks'
 
+export type SwapProviderIdType = 'liquality' | 'uniswapV2' | 'sovryn' | 'liqualityBoost'
+
+export type SwapProviderType = {
+  name: string
+  icon: string
+  type: SwapProvidersEnum
+  agent?: string
+  network?: string
+  routerAddress?: string
+  routerAddressRBTC?: unknown
+  rpcURL?: string
+  supportedBridgeAssets?: string[]
+}
+
 export type Mnemonic = string
+
+export enum SwapProvidersEnum {
+  LIQUALITY = 'LIQUALITY',
+  LIQUALITYBOOST = 'LIQUALITYBOOST',
+  SOVRYN = 'SOVRYN'
+}
 
 export enum NetworkEnum {
   Mainnet = 'mainnet',
@@ -71,6 +92,8 @@ export interface IConfig {
   getBitcoinFeeUrl(): string
   getTestnetContractAddress(assetSymbol: string): string
   getSovereignRPCAPIUrl(network: NetworkEnum): string
+  getSwapProvider(network: NetworkEnum, providerId: string): SwapProviderType
+  getAgentUrl(network: NetworkEnum, providerId: SwapProvidersEnum): string
 }
 
 export interface IWalletConstructor<T> {
@@ -89,7 +112,7 @@ export interface IWallet<T> {
   /**
    * Generates some values necessary to build the wallet state on the client
    */
-  init(password: string, mnemonic: string): InitialStateType
+  init(password: string, mnemonic: Mnemonic, imported: boolean): Promise<StateType>
 
   /**
    * One stop shop that shows how to build a functioning wallet
@@ -141,9 +164,17 @@ export interface IWallet<T> {
 
   /**
    * Subscribes a callback that will be called whenever the accounts have been fetched/updated
+   * @param event The event that triggers the provided callback
    * @param callback
    */
   subscribe(callback: (account: AccountType) => void)
+
+  /**
+   * Subscribes a callback that will be called whenever the corresponding trigger has been fired off
+   * @param trigger
+   * @param callback
+   */
+  on(trigger: TriggerType, callback: (...args: unknown[]) => void)
 
   /**
    * Refresh balances, fees and fiat rates for the different accounts/assets
@@ -151,11 +182,10 @@ export interface IWallet<T> {
   refresh()
 
   /**
-   * Fetches the fiat prices/rates for the provided list of assets
-   * @param baseCurrencies
-   * @param toCurrency
+   * Return a swap provider if it exists, otherwise, create a new one and return it
+   * @param swapProviderType
    */
-  fetchPricesForAssets(baseCurrencies: Array<string>, toCurrency: string): Promise<StateType['fiatRates']>
+  getSwapProvider(swapProviderType: SwapProvidersEnum): ISwapProvider
 
   /**
    * Checks if the current wallet is newly installed
@@ -219,7 +249,13 @@ export interface IAccount {
    * Fetches fiat rates for the assets associated with the current account
    */
   fetchPricesForAssets(toCurrency: string): Promise<StateType['fiatRates']>
+
+  /**
+   * Refreshes the account info
+   */
   refresh(): Promise<AccountType>
+
+  getClient(): Client
 }
 
 export interface IAsset {
@@ -239,6 +275,11 @@ export interface IAsset {
   getBalance(): Promise<BigNumber>
 
   /**
+   * Returns the client used by the current asset
+   */
+  getClient(): Client
+
+  /**
    * Performs a transaction
    * @param options the payload information necessary to perform the transaction
    * @returns return a transaction object
@@ -251,7 +292,25 @@ export interface IAsset {
   getPastTransactions(): Promise<Transaction[]>
 }
 
+export interface ISwapProvider {
+  getSupportedPairs(): Promise<MarketDataType[]>
+  getQuote(marketData: MarketDataType[], from: string, to: string, amount: BigNumber): QuoteType
+  performSwap(
+    fromAccount: IAccount,
+    toAccount: IAccount,
+    fromAsset: string,
+    quote: Partial<SwapPayloadType>
+  ): Promise<Partial<SwapTransactionType>>
+  estimateFees(
+    asset: string,
+    txType: string,
+    quote: QuoteType,
+    feePrices: number[],
+    max: number
+  ): Promise<Record<number, BigNumber>>
+}
 //-----------------------------------DATA TYPES----------------------------
+export type TriggerType = 'onInit' | 'onAccountUpdate' | 'onMarketDataUpdate' | 'onFiatRatesUpdate'
 export type GasSpeedType = 'slow' | 'average' | 'fast'
 export type InitialStateType = {
   activeWalletId: string
@@ -282,6 +341,56 @@ export type ChainNetworkType = Record<
   ChainId,
   Record<NetworkEnum.Mainnet & NetworkEnum.Testnet, BitcoinNetwork & EthereumNetwork>
 >
+
+export type MarketDataType = {
+  provider: string
+  from: string
+  to: string
+  rate: number
+  min: number
+  max: number
+}
+
+export type QuoteType = {
+  from: string
+  to: string
+  fromAddress?: string
+  toAddress?: string
+  fromAmount?: BigNumber
+  toAmount?: BigNumber
+  expireAt?: number
+  swapExpiration?: number
+  fee?: number
+  fromCounterPartyAddress?: string
+  toCounterPartyAddress?: string
+}
+
+export type SwapPayloadType = {
+  from: string
+  to: string
+  fromAmount: BigNumber
+  toAmount: BigNumber
+  type: string
+  network: NetworkEnum
+  startTime: number
+  walletId: string
+  fee: number
+  claimFee: number
+}
+
+export type SwapTransactionType = {
+  from: string
+  to: string
+  fromAmount: BigNumber
+  toAmount: BigNumber
+  expireAt: number
+  fee: number
+  status: string
+  secret: string
+  secretHash: string
+  fromFundHash: string
+  fromFundTx: Transaction
+}
 
 // helper to get the type of an array element
 export type ArrayElement<A> = A extends readonly (infer T)[] ? T : never
@@ -330,7 +439,7 @@ export interface StateType {
     >
   >
   history?: unknown
-  marketData?: unknown
+  marketData?: MarketDataType[]
   activeNetwork?: NetworkEnum
   activeWalletId?: string
   activeAsset?: unknown

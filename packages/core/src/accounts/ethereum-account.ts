@@ -203,6 +203,10 @@ export default class EthereumAccount implements IAccount {
     }
   }
 
+  public getClient(): Client {
+    return this._client
+  }
+
   private createEthereumClient(
     ethereumNetwork: EthereumNetwork,
     rpcApi: string,
