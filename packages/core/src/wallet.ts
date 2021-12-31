@@ -11,7 +11,6 @@ import {
   NetworkEnum,
   StateType,
   SwapProvidersEnum,
-  ISwapProvider,
   TriggerType
 } from './types'
 import { ChainId } from '@liquality/cryptoassets'
@@ -21,6 +20,7 @@ import EthereumAccount from './accounts/ethereum-account'
 import BitcoinAccount from './accounts/bitcoin-account'
 import RSKAccount from './accounts/rsk-account'
 import LiqualitySwapProvider from './swaps/liquality-swap-provider'
+import SwapProvider from './swaps/swap-provider'
 
 export default class Wallet implements IWallet<StateType> {
   private SALT_BYTE_COUNT = 32
@@ -34,7 +34,7 @@ export default class Wallet implements IWallet<StateType> {
   private _password: string
   private _activeNetwork: NetworkEnum
   private _activeWalletId: string
-  private _swapProviders: Partial<Record<SwapProvidersEnum, ISwapProvider>>
+  private _swapProviders: Partial<Record<SwapProvidersEnum, SwapProvider>>
 
   public constructor(storage: IStorage<StateType>, encryption: IEncryption, config: IConfig) {
     this._storage = storage
@@ -205,7 +205,7 @@ export default class Wallet implements IWallet<StateType> {
     }
   }
 
-  public getSwapProvider(swapProviderType: SwapProvidersEnum): ISwapProvider {
+  public getSwapProvider(swapProviderType: SwapProvidersEnum): SwapProvider {
     if (this._swapProviders[swapProviderType]) return this._swapProviders[swapProviderType]
 
     this._swapProviders[swapProviderType] = new LiqualitySwapProvider(

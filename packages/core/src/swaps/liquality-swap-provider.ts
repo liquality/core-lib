@@ -10,7 +10,6 @@ import {
 import {
   IAccount,
   IConfig,
-  ISwapProvider,
   MarketDataType,
   NetworkEnum,
   QuoteType,
@@ -22,14 +21,16 @@ import {
 import { Client } from '@liquality/client'
 import { sha256 } from '@liquality/crypto'
 import { prettyBalance } from '../utils/coin-formatter'
+import SwapProvider from './swap-provider'
+import { isERC20 } from '../utils'
 
+//TODO find a different way to get the version
 export const VERSION_STRING = '1.9.1'
 // export const VERSION_STRING = `Wallet ${pkg.version} (CAL ${pkg.dependencies['@liquality/client']
 //   .replace('^', '')
 //   .replace('~', '')})`
 
-export default class LiqualitySwapProvider implements ISwapProvider {
-  private _config: IConfig
+export default class LiqualitySwapProvider extends SwapProvider {
   private _activewalletId: string
   private _activeNetwork: NetworkEnum
   private _client: Client
@@ -51,6 +52,7 @@ export default class LiqualitySwapProvider implements ISwapProvider {
     activeWalletId: string,
     callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>
   ) {
+    super()
     this._config = config
     this._activewalletId = activeWalletId
     this._activeNetwork = activeNetwork
@@ -59,7 +61,6 @@ export default class LiqualitySwapProvider implements ISwapProvider {
 
     //Fetch market data
     this.getSupportedPairs().then((pairs) => {
-      console.log('market data: ', pairs, this._callbacks)
       this._callbacks['onMarketDataUpdate']?.(pairs)
     })
   }
@@ -91,7 +92,7 @@ export default class LiqualitySwapProvider implements ISwapProvider {
     return marketData
   }
 
-  public getQuote(marketData: MarketDataType[], from: string, to: string, amount: BigNumber): QuoteType {
+  public getQuote(marketData: MarketDataType[], from: string, to: string, amount: BigNumber): Promise<QuoteType> {
     // Quotes are retrieved using market data because direct quotes take a long time for BTC swaps (agent takes long to generate new address)
     const market = marketData.find(
       (market) =>
@@ -112,12 +113,12 @@ export default class LiqualitySwapProvider implements ISwapProvider {
     )
 
     //TODO there are two versions of BigNumber conflicting: TOFIX
-    return {
+    return Promise.resolve({
       from,
       to,
       fromAmount: new BigNumber(fromAmount),
       toAmount: new BigNumber(toAmount)
-    }
+    })
   }
 
   public async performSwap(
@@ -126,11 +127,9 @@ export default class LiqualitySwapProvider implements ISwapProvider {
     fromAsset: string,
     quote: Partial<SwapPayloadType>
   ): Promise<Partial<SwapTransactionType>> {
-    console.log('User quote: ', quote)
     // Quote from the user
     const { from, to, fromAmount, toAmount } = quote
 
-    console.log('URL: ', this._config.getAgentUrl(this._activeNetwork, this._provider) + '/api/swap/order')
     // Quote from the agent
     const lockedQuote = (
       await axios.post(
@@ -149,8 +148,6 @@ export default class LiqualitySwapProvider implements ISwapProvider {
       )
     ).data
 
-    console.log('Locked quote: ', lockedQuote)
-
     //TODO store this hard-coded value in a config file
     if (new BigNumber(lockedQuote.toAmount).lt(toAmount.times(0.995))) {
       throw new Error('The quote slippage is too high (> 0.5%). Try again.')
@@ -163,8 +160,6 @@ export default class LiqualitySwapProvider implements ISwapProvider {
       fromAddress: (await fromAccount.getUnusedAddress()).address,
       toAddress: (await toAccount.getUnusedAddress()).address
     }
-
-    console.log('Merged quote: ', mergedQuote)
 
     //Make sure the quote has not expired
     if (Date.now() >= mergedQuote.expireAt) {
@@ -201,7 +196,6 @@ export default class LiqualitySwapProvider implements ISwapProvider {
       `Timestamp: ${mergedQuote.swapExpiration}`
     ].join('\n')
 
-    console.log('Message: ', message)
     const messageHex = Buffer.from(message, 'utf8').toString('hex')
     const secret = await fromClient.swap.generateSecret(messageHex)
     const secretHash = sha256(secret)
@@ -217,8 +211,6 @@ export default class LiqualitySwapProvider implements ISwapProvider {
       mergedQuote.fee
     )
 
-    console.log('Transaction: ', fromFundTx)
-
     return {
       ...mergedQuote,
       status: 'INITIATED',
@@ -230,32 +222,33 @@ export default class LiqualitySwapProvider implements ISwapProvider {
   }
 
   public async estimateFees(
-    asset: string,
+    fromAccount: IAccount,
+    fromAsset: string,
     txType: string,
     quote: QuoteType,
     feePrices: number[],
     max: number
   ): Promise<Record<number, BigNumber>> {
-    if (txType === LiqualitySwapProvider.txTypes.SWAP_INITIATION && asset === 'BTC') {
+    if (txType === LiqualitySwapProvider.txTypes.SWAP_INITIATION && fromAsset === 'BTC') {
       const value = max ? undefined : new BigNumber(quote.fromAmount)
       const txs = feePrices.map((fee) => ({ to: '', value, fee }))
       const totalFees = await this._client.getMethod('getTotalFees')(txs, max)
       const initialValue: Record<number, BigNumber> = {}
 
       return Object.values<number[]>(totalFees).reduce((acc: Record<number, BigNumber>, [, value]) => {
-        acc[value] = new BigNumber(unitToCurrency(cryptoassets[asset], value))
+        acc[value] = new BigNumber(unitToCurrency(cryptoassets[fromAsset], value))
         return acc
       }, initialValue)
     }
 
-    if (txType === LiqualitySwapProvider.txTypes.SWAP_INITIATION && asset === 'UST') {
+    if (txType === LiqualitySwapProvider.txTypes.SWAP_INITIATION && fromAsset === 'UST') {
       const value = max ? undefined : new BigNumber(quote.fromAmount)
       const taxFees = await this._client.getMethod('getTaxFees')(value, 'uusd', max || !value)
 
       const fees: Record<number, BigNumber> = {}
 
       for (const feePrice of feePrices) {
-        fees[feePrice] = this.getTxFee(LiqualitySwapProvider.feeUnits[txType], asset, feePrice).plus(taxFees)
+        fees[feePrice] = this.getTxFee(LiqualitySwapProvider.feeUnits[txType], fromAsset, feePrice).plus(taxFees)
       }
 
       return fees
@@ -264,22 +257,38 @@ export default class LiqualitySwapProvider implements ISwapProvider {
     if (txType in LiqualitySwapProvider.feeUnits) {
       const fees = {}
       for (const feePrice of feePrices) {
-        fees[feePrice] = this.getTxFee(LiqualitySwapProvider.feeUnits[txType], asset, feePrice)
+        fees[feePrice] = this.getTxFee(LiqualitySwapProvider.feeUnits[txType], fromAsset, feePrice)
       }
       return fees
     }
   }
 
-  //Helper methods
-  private isERC20(asset: string): boolean {
-    return cryptoassets[asset]?.type === 'erc20'
+  performNextSwapAction(network: NetworkEnum, walletId: string, swap: any) {
+    let updates
+    //TODO Implement a rules engine for this logic
+    switch (swap.status) {
+      case 'WAITING_FOR_APPROVE_CONFIRMATIONS':
+        // updates = await withInterval(async () => this.waitForApproveConfirmations({ swap, network, walletId }))
+        break
+      case 'APPROVE_CONFIRMED':
+        // updates = await withLock(store, { item: swap, network, walletId, asset: swap.from }, async () =>
+        //   this.sendSwap({ quote: swap, network, walletId })
+        // )
+        break
+      case 'WAITING_FOR_SWAP_CONFIRMATIONS':
+        // updates = await withInterval(async () => this.waitForSwapConfirmations({ swap, network, walletId }))
+        break
+    }
+
+    return updates
   }
 
+  //Helper methods
   private getTxFee(units, _asset, _feePrice): BigNumber {
     const chainId = cryptoassets[_asset].chain
     const nativeAsset = chains[chainId].nativeAsset
     const feePrice = isEthereumChain(_asset) ? new BigNumber(_feePrice).times(1e9) : _feePrice // ETH fee price is in gwei
-    const asset = this.isERC20(_asset) ? 'ERC20' : _asset
+    const asset = isERC20(_asset) ? 'ERC20' : _asset
     const feeUnits = units[asset]
     return new BigNumber(unitToCurrency(cryptoassets[nativeAsset], new BigNumber(feeUnits).times(feePrice).toNumber()))
   }
@@ -317,96 +326,98 @@ export default class LiqualitySwapProvider implements ISwapProvider {
     }
   }
 
-  static statuses = {
-    INITIATED: {
-      step: 0,
-      label: 'Locking {from}',
-      filterStatus: 'PENDING'
-    },
-    INITIATION_REPORTED: {
-      step: 0,
-      label: 'Locking {from}',
-      filterStatus: 'PENDING',
-      notification() {
-        return {
-          message: 'Swap initiated'
+  public get statuses() {
+    return {
+      INITIATED: {
+        step: 0,
+        label: 'Locking {from}',
+        filterStatus: 'PENDING'
+      },
+      INITIATION_REPORTED: {
+        step: 0,
+        label: 'Locking {from}',
+        filterStatus: 'PENDING',
+        notification() {
+          return {
+            message: 'Swap initiated'
+          }
         }
-      }
-    },
-    INITIATION_CONFIRMED: {
-      step: 0,
-      label: 'Locking {from}',
-      filterStatus: 'PENDING'
-    },
-    FUNDED: {
-      step: 1,
-      label: 'Locking {to}',
-      filterStatus: 'PENDING'
-    },
-    CONFIRM_COUNTER_PARTY_INITIATION: {
-      step: 1,
-      label: 'Locking {to}',
-      filterStatus: 'PENDING',
-      notification(swap) {
-        return {
-          message: `Counterparty sent ${prettyBalance(swap.toAmount, swap.to)} ${swap.to} to escrow`
+      },
+      INITIATION_CONFIRMED: {
+        step: 0,
+        label: 'Locking {from}',
+        filterStatus: 'PENDING'
+      },
+      FUNDED: {
+        step: 1,
+        label: 'Locking {to}',
+        filterStatus: 'PENDING'
+      },
+      CONFIRM_COUNTER_PARTY_INITIATION: {
+        step: 1,
+        label: 'Locking {to}',
+        filterStatus: 'PENDING',
+        notification(swap) {
+          return {
+            message: `Counterparty sent ${prettyBalance(swap.toAmount, swap.to)} ${swap.to} to escrow`
+          }
         }
-      }
-    },
-    READY_TO_CLAIM: {
-      step: 2,
-      label: 'Claiming {to}',
-      filterStatus: 'PENDING',
-      notification() {
-        return {
-          message: 'Claiming funds'
+      },
+      READY_TO_CLAIM: {
+        step: 2,
+        label: 'Claiming {to}',
+        filterStatus: 'PENDING',
+        notification() {
+          return {
+            message: 'Claiming funds'
+          }
         }
-      }
-    },
-    WAITING_FOR_CLAIM_CONFIRMATIONS: {
-      step: 2,
-      label: 'Claiming {to}',
-      filterStatus: 'PENDING'
-    },
-    WAITING_FOR_REFUND: {
-      step: 2,
-      label: 'Pending Refund',
-      filterStatus: 'PENDING'
-    },
-    GET_REFUND: {
-      step: 2,
-      label: 'Refunding {from}',
-      filterStatus: 'PENDING'
-    },
-    WAITING_FOR_REFUND_CONFIRMATIONS: {
-      step: 2,
-      label: 'Refunding {from}',
-      filterStatus: 'PENDING'
-    },
-    REFUNDED: {
-      step: 3,
-      label: 'Refunded',
-      filterStatus: 'REFUNDED',
-      notification(swap) {
-        return {
-          message: `Swap refunded, ${prettyBalance(swap.fromAmount, swap.from)} ${swap.from} returned`
+      },
+      WAITING_FOR_CLAIM_CONFIRMATIONS: {
+        step: 2,
+        label: 'Claiming {to}',
+        filterStatus: 'PENDING'
+      },
+      WAITING_FOR_REFUND: {
+        step: 2,
+        label: 'Pending Refund',
+        filterStatus: 'PENDING'
+      },
+      GET_REFUND: {
+        step: 2,
+        label: 'Refunding {from}',
+        filterStatus: 'PENDING'
+      },
+      WAITING_FOR_REFUND_CONFIRMATIONS: {
+        step: 2,
+        label: 'Refunding {from}',
+        filterStatus: 'PENDING'
+      },
+      REFUNDED: {
+        step: 3,
+        label: 'Refunded',
+        filterStatus: 'REFUNDED',
+        notification(swap) {
+          return {
+            message: `Swap refunded, ${prettyBalance(swap.fromAmount, swap.from)} ${swap.from} returned`
+          }
         }
-      }
-    },
-    SUCCESS: {
-      step: 3,
-      label: 'Completed',
-      filterStatus: 'COMPLETED',
-      notification(swap) {
-        return {
-          message: `Swap completed, ${prettyBalance(swap.toAmount, swap.to)} ${swap.to} ready to use`
+      },
+      SUCCESS: {
+        step: 3,
+        label: 'Completed',
+        filterStatus: 'COMPLETED',
+        notification(swap) {
+          return {
+            message: `Swap completed, ${prettyBalance(swap.toAmount, swap.to)} ${swap.to} ready to use`
+          }
         }
+      },
+      QUOTE_EXPIRED: {
+        step: 3,
+        label: 'Quote Expired',
+        filterStatus: 'REFUNDED'
       }
-    },
-    QUOTE_EXPIRED: {
-      step: 3,
-      label: 'Quote Expired',
-      filterStatus: 'REFUNDED'
     }
   }
 }

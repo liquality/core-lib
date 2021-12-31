@@ -202,4 +202,8 @@ export class Config implements IConfig {
   public getAgentUrl(network: NetworkEnum, provider: SwapProvidersEnum): string {
     return swapProviders[network][provider].agent
   }
+
+  public getInfuraAPIKey(): string {
+    return this._infuraAPIKey
+  }
 }

@@ -14,6 +14,7 @@ import { Address, BigNumber, FeeDetails, SendOptions, Transaction } from '@liqua
 import { Client } from '@liquality/client'
 import { BitcoinNetwork } from '@liquality/bitcoin-networks'
 import { EthereumNetwork } from '@liquality/ethereum-networks'
+import SwapProvider from './swaps/swap-provider'
 
 export type SwapProviderIdType = 'liquality' | 'uniswapV2' | 'sovryn' | 'liqualityBoost'
 
@@ -22,9 +23,10 @@ export type SwapProviderType = {
   icon: string
   type: SwapProvidersEnum
   agent?: string
+  node?: string
   network?: string
   routerAddress?: string
-  routerAddressRBTC?: unknown
+  routerAddressRBTC?: string
   rpcURL?: string
   supportedBridgeAssets?: string[]
 }
@@ -34,7 +36,8 @@ export type Mnemonic = string
 export enum SwapProvidersEnum {
   LIQUALITY = 'LIQUALITY',
   LIQUALITYBOOST = 'LIQUALITYBOOST',
-  SOVRYN = 'SOVRYN'
+  SOVRYN = 'SOVRYN',
+  THORCHAIN = 'THORCHAIN'
 }
 
 export enum NetworkEnum {
@@ -94,6 +97,7 @@ export interface IConfig {
   getSovereignRPCAPIUrl(network: NetworkEnum): string
   getSwapProvider(network: NetworkEnum, providerId: string): SwapProviderType
   getAgentUrl(network: NetworkEnum, providerId: SwapProvidersEnum): string
+  getInfuraAPIKey(): string
 }
 
 export interface IWalletConstructor<T> {
@@ -185,7 +189,7 @@ export interface IWallet<T> {
    * Return a swap provider if it exists, otherwise, create a new one and return it
    * @param swapProviderType
    */
-  getSwapProvider(swapProviderType: SwapProvidersEnum): ISwapProvider
+  getSwapProvider(swapProviderType: SwapProvidersEnum): SwapProvider
 
   /**
    * Checks if the current wallet is newly installed
@@ -363,6 +367,7 @@ export type QuoteType = {
   fee?: number
   fromCounterPartyAddress?: string
   toCounterPartyAddress?: string
+  path?: string
 }
 
 export type SwapPayloadType = {
@@ -379,6 +384,7 @@ export type SwapPayloadType = {
 }
 
 export type SwapTransactionType = {
+  id: string
   from: string
   to: string
   fromAmount: BigNumber
@@ -390,6 +396,7 @@ export type SwapTransactionType = {
   secretHash: string
   fromFundHash: string
   fromFundTx: Transaction
+  slippage: number
 }
 
 // helper to get the type of an array element
