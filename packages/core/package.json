@@ -18,7 +18,7 @@
     "access": "public"
   },
   "devDependencies": {
-    "@types/uuid": "8.3.3"
+    "@types/uuid": "8.3.4"
   },
   "dependencies": {
     "@liquality/bitcoin-esplora-batch-api-provider": "^1.9.1",
