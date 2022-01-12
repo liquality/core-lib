@@ -96,6 +96,7 @@ export interface IConfig {
   getTestnetContractAddress(assetSymbol: string): string
   getSovereignRPCAPIUrl(network: NetworkEnum): string
   getSwapProvider(network: NetworkEnum, providerId: string): SwapProviderType
+  getSwapProviders(network: NetworkEnum): Partial<Record<SwapProvidersEnum, SwapProviderType>>
   getAgentUrl(network: NetworkEnum, providerId: SwapProvidersEnum): string
   getInfuraAPIKey(): string
 }
@@ -165,6 +166,11 @@ export interface IWallet<T> {
    * Returns all the accounts that have been fetched so far.
    */
   getAccounts(): AccountMapping
+
+  /**
+   * Returns the active/enabled swap providers
+   */
+  getSwapProviders(): Partial<Record<SwapProvidersEnum, SwapProvider>>
 
   /**
    * Subscribes a callback that will be called whenever the accounts have been fetched/updated
@@ -368,6 +374,7 @@ export type QuoteType = {
   fromCounterPartyAddress?: string
   toCounterPartyAddress?: string
   path?: string
+  provider?: SwapProvidersEnum
 }
 
 export type SwapPayloadType = {

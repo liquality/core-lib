@@ -21,20 +21,21 @@ import BitcoinAccount from './accounts/bitcoin-account'
 import RSKAccount from './accounts/rsk-account'
 import LiqualitySwapProvider from './swaps/liquality-swap-provider'
 import SwapProvider from './swaps/swap-provider'
+import SovrynSwapProvider from './swaps/sovryn-swap-provider'
 
 export default class Wallet implements IWallet<StateType> {
   private SALT_BYTE_COUNT = 32
   private _storage: IStorage<StateType>
   private _encryption: IEncryption
   private _callback: (account: AccountType) => void
-  private _callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>
-  private _config: IConfig
-  private _accounts: AccountMapping
+  private readonly _callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>
+  private readonly _config: IConfig
+  private readonly _accounts: AccountMapping
   private _mnemonic: Mnemonic
   private _password: string
   private _activeNetwork: NetworkEnum
   private _activeWalletId: string
-  private _swapProviders: Partial<Record<SwapProvidersEnum, SwapProvider>>
+  private readonly _swapProviders: Partial<Record<SwapProvidersEnum, SwapProvider>>
 
   public constructor(storage: IStorage<StateType>, encryption: IEncryption, config: IConfig) {
     this._storage = storage
@@ -43,6 +44,11 @@ export default class Wallet implements IWallet<StateType> {
     this._accounts = {}
     this._swapProviders = {}
     this._callbacks = {}
+    this._activeNetwork = config.getDefaultNetwork()
+
+    for (const providerKey of Object.keys(this._config.getSwapProviders(this._activeNetwork))) {
+      this._swapProviders[providerKey] = this.getSwapProvider(providerKey as SwapProvidersEnum)
+    }
   }
 
   public async init(password: string, mnemonic: Mnemonic, imported: boolean): Promise<StateType> {
@@ -208,14 +214,26 @@ export default class Wallet implements IWallet<StateType> {
   public getSwapProvider(swapProviderType: SwapProvidersEnum): SwapProvider {
     if (this._swapProviders[swapProviderType]) return this._swapProviders[swapProviderType]
 
-    this._swapProviders[swapProviderType] = new LiqualitySwapProvider(
-      this._config,
-      this._activeNetwork,
-      this._activeWalletId,
-      this._callbacks
-    )
+    if (swapProviderType === SwapProvidersEnum.LIQUALITY) {
+      this._swapProviders[swapProviderType] = new LiqualitySwapProvider(
+        this._config,
+        this._activeNetwork,
+        this._activeWalletId,
+        this._callbacks
+      )
+    } else if (swapProviderType === SwapProvidersEnum.SOVRYN) {
+      this._swapProviders[swapProviderType] = new SovrynSwapProvider(
+        this._config,
+        this._activeNetwork,
+        this._activeWalletId
+      )
+    }
 
     return this._swapProviders[swapProviderType]
+  }
+
+  public getSwapProviders(): Partial<Record<SwapProvidersEnum, SwapProvider>> {
+    return this._swapProviders
   }
 
   public async isNewInstallation(): Promise<boolean> {

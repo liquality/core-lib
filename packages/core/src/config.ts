@@ -199,6 +199,10 @@ export class Config implements IConfig {
     return swapProviders[network][providerId]
   }
 
+  public getSwapProviders(network: NetworkEnum): Partial<Record<SwapProvidersEnum, SwapProviderType>> {
+    return swapProviders[network]
+  }
+
   public getAgentUrl(network: NetworkEnum, provider: SwapProvidersEnum): string {
     return swapProviders[network][provider].agent
   }
