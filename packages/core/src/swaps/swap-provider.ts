@@ -28,7 +28,7 @@ abstract class SwapProvider {
    * Get the supported pairs of this provider for this network
    * @param network
    */
-  abstract getSupportedPairs(network: NetworkEnum)
+  abstract getSupportedPairs(): Promise<MarketDataType[]>
 
   /**
    * Get a quote for the specified parameters
@@ -49,7 +49,6 @@ abstract class SwapProvider {
   abstract performSwap(
     fromAccount: IAccount,
     toAccount: IAccount,
-    fromAsset: string,
     quote: Partial<SwapPayloadType>
   ): Promise<Partial<SwapTransactionType>>
 

@@ -91,7 +91,6 @@ class SovrynSwapProvider extends SwapProvider {
   public async performSwap(
     fromAccount: IAccount,
     toAccount: IAccount,
-    fromAsset: string,
     quote: Partial<SwapPayloadType>
   ): Promise<Partial<SwapTransactionType>> {
     const approvalRequired = isERC20(quote.from)

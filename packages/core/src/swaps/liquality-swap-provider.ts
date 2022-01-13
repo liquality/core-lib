@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios, { AxiosResponse } from 'axios'
 import { BigNumber, Transaction } from '@liquality/types'
 import {
   assets as cryptoassets,
@@ -29,6 +29,51 @@ export const VERSION_STRING = '1.9.1'
 // export const VERSION_STRING = `Wallet ${pkg.version} (CAL ${pkg.dependencies['@liquality/client']
 //   .replace('^', '')
 //   .replace('~', '')})`
+
+type LockedQuoteType = {
+  id: string
+  orderId: string
+  from: string
+  to: string
+  fromAmount: number
+  toAmount: number
+  rate: number
+  spread: number
+  minConf: number
+  expiresAt: number
+  hasAgentUnconfirmedTx: boolean
+  hasUserUnconfirmedTx: boolean
+  hasUnconfirmedTx: boolean
+  status: string //'QUOTE' | 'INITIATED'
+  userAgent: string //userAgent version
+  swapExpiration: number
+  nodeSwapExpiration: number
+  fromRateUsd: number
+  toRateUsd: number
+  fromAmountUsd: number
+  toAmountUsd: number
+  fromCounterPartyAddress: string
+  toCounterPartyAddress: string
+  createdAt: string
+  updatedAt: string
+  totalAgentFeeUsd: number
+  totalUserFeeUsd: number
+  totalFeeUsd: number
+}
+
+type RequestDataType = {
+  from: string
+  to: string
+  fromAmount: number
+  toAmount: number
+}
+
+interface MergedQuoteType extends LockedQuoteType {
+  fromAddress: string
+  toAddress: string
+  fee: number
+  claimFee: number
+}
 
 export default class LiqualitySwapProvider extends SwapProvider {
   private _activewalletId: string
@@ -124,20 +169,20 @@ export default class LiqualitySwapProvider extends SwapProvider {
   public async performSwap(
     fromAccount: IAccount,
     toAccount: IAccount,
-    fromAsset: string,
     quote: Partial<SwapPayloadType>
-  ): Promise<Partial<SwapTransactionType>> {
+  ): Promise<Partial<SwapTransactionType & LockedQuoteType>> {
     // Quote from the user
     const { from, to, fromAmount, toAmount } = quote
 
     // Quote from the agent
     const lockedQuote = (
-      await axios.post(
+      await axios.post<LockedQuoteType, AxiosResponse<LockedQuoteType>, Partial<RequestDataType>>(
         this._config.getAgentUrl(this._activeNetwork, this._provider) + '/api/swap/order',
         {
           from,
           to,
-          fromAmount
+          fromAmount: fromAmount.toNumber(),
+          toAmount: toAmount.toNumber()
         },
         {
           headers: {
@@ -154,15 +199,16 @@ export default class LiqualitySwapProvider extends SwapProvider {
     }
 
     //Merge the two quotes
-    const mergedQuote: Partial<QuoteType> = {
-      ...quote,
+    const mergedQuote: MergedQuoteType = {
       ...lockedQuote,
+      fee: quote.fee,
+      claimFee: quote.claimFee,
       fromAddress: (await fromAccount.getUnusedAddress()).address,
       toAddress: (await toAccount.getUnusedAddress()).address
     }
 
     //Make sure the quote has not expired
-    if (Date.now() >= mergedQuote.expireAt) {
+    if (Date.now() >= mergedQuote.expiresAt) {
       throw new Error('The quote is expired.')
     }
 
@@ -171,19 +217,11 @@ export default class LiqualitySwapProvider extends SwapProvider {
     const fromClient =
       assets.length === 0
         ? fromAccount.getClient()
-        : assets.filter((asset) => asset.getSymbol() === fromAsset)[0].getClient()
+        : assets.filter((asset) => asset.getSymbol() === from)[0].getClient()
 
     if (!fromClient) {
       throw new Error('No compatible client found.')
     }
-    // const quote: Partial<SwapPayloadType> = {
-    //   type: 'SWAP',
-    //   network: this._activeNetwork,
-    //   startTime: Date.now(),
-    //   walletId: this._activeWalletId,
-    //   fee: swapPayload.fee,
-    //   claimFee: swapPayload.claimFee
-    // }
 
     const message = [
       'Creating a swap with following terms:',

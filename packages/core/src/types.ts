@@ -394,8 +394,8 @@ export type SwapTransactionType = {
   id: string
   from: string
   to: string
-  fromAmount: BigNumber
-  toAmount: BigNumber
+  fromAmount: number
+  toAmount: number
   expireAt: number
   fee: number
   status: string

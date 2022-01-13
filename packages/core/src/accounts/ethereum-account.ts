@@ -11,6 +11,10 @@ import { EthereumJsWalletProvider } from '@liquality/ethereum-js-wallet-provider
 import Asset from '../asset'
 import { EthereumErc20Provider } from '@liquality/ethereum-erc20-provider'
 import axios from 'axios'
+import { EthereumErc20SwapProvider } from '@liquality/ethereum-erc20-swap-provider'
+import { EthereumErc20ScraperSwapFindProvider } from '@liquality/ethereum-erc20-scraper-swap-find-provider'
+import { EthereumSwapProvider } from '@liquality/ethereum-swap-provider'
+import { EthereumScraperSwapFindProvider } from '@liquality/ethereum-scraper-swap-find-provider'
 
 export default class EthereumAccount implements IAccount {
   private _mnemonic: Mnemonic
@@ -44,6 +48,9 @@ export default class EthereumAccount implements IAccount {
     const ethereumNetwork = config.getChainNetwork(chain, network)
     const infuraApi = isTestnet ? config.getEthereumTestnet() : config.getEthereumMainnet()
     const feeProvider = isTestnet ? new EthereumRpcFeeProvider() : new EthereumGasNowFeeProvider()
+    const scraperApi = isTestnet
+      ? 'https://liquality.io/arbitrum-testnet-api'
+      : 'https://liquality.io/arbitrum-mainnet-api'
 
     this._config = config
     this._mnemonic = mnemonic
@@ -55,9 +62,10 @@ export default class EthereumAccount implements IAccount {
     this._at = Date.now()
     this._assets = []
     this._derivationPath = this.calculateDerivationPath()
-    this._client = this.createEthereumClient(
+    this._client = EthereumAccount.createEthereumClient(
       ethereumNetwork as EthereumNetwork,
       infuraApi,
+      scraperApi,
       feeProvider,
       this._mnemonic,
       this._derivationPath
@@ -97,11 +105,14 @@ export default class EthereumAccount implements IAccount {
   }
 
   public async getAssets(): Promise<IAsset[]> {
-    if (!this._address) this.getUsedAddress()
+    if (!this._address) await this.getUsedAddress()
     const isTestnet = this._network === NetworkEnum.Testnet
     const ethereumNetwork = this._config.getChainNetwork(this._chain, this._network)
     const infuraApi = isTestnet ? this._config.getEthereumTestnet() : this._config.getEthereumMainnet()
     const feeProvider = isTestnet ? new EthereumRpcFeeProvider() : new EthereumGasNowFeeProvider()
+    const scraperApi = isTestnet
+      ? 'https://liquality.io/arbitrum-testnet-api'
+      : 'https://liquality.io/arbitrum-mainnet-api'
 
     const _assetSymbols = this._config.getDefaultEnabledAssets(this._network)
     this._assets = _assetSymbols
@@ -109,9 +120,10 @@ export default class EthereumAccount implements IAccount {
         return cryptoassets[asset]?.chain === this._chain
       })
       .map((asset) => {
-        const client = this.createEthereumClient(
-          ethereumNetwork as EthereumNetwork,
+        const client = EthereumAccount.createEthereumClient(
+          ethereumNetwork,
           infuraApi,
+          scraperApi,
           feeProvider,
           this._mnemonic,
           this._derivationPath,
@@ -207,9 +219,10 @@ export default class EthereumAccount implements IAccount {
     return this._client
   }
 
-  private createEthereumClient(
+  private static createEthereumClient(
     ethereumNetwork: EthereumNetwork,
     rpcApi: string,
+    scraperApi: string,
     feeProvider: EthereumRpcFeeProvider | EthereumGasNowFeeProvider,
     mnemonic: string,
     derivationPath: string,
@@ -229,6 +242,11 @@ export default class EthereumAccount implements IAccount {
     if (asset && cryptoassets[asset]?.type === 'erc20') {
       const contractAddress = cryptoassets[asset].contractAddress
       ethClient.addProvider(new EthereumErc20Provider(contractAddress))
+      ethClient.addProvider(new EthereumErc20SwapProvider())
+      if (scraperApi) ethClient.addProvider(new EthereumErc20ScraperSwapFindProvider(scraperApi))
+    } else {
+      ethClient.addProvider(new EthereumSwapProvider())
+      if (scraperApi) ethClient.addProvider(new EthereumScraperSwapFindProvider(scraperApi))
     }
 
     ethClient.addProvider(feeProvider)
