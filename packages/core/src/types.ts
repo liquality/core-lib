@@ -320,6 +320,51 @@ export interface ISwapProvider {
   ): Promise<Record<number, BigNumber>>
 }
 //-----------------------------------DATA TYPES----------------------------
+export type LockedQuoteType = {
+  id: string
+  orderId: string
+  from: string
+  to: string
+  fromAmount: number
+  toAmount: number
+  rate: number
+  spread: number
+  minConf: number
+  expiresAt: number
+  hasAgentUnconfirmedTx: boolean
+  hasUserUnconfirmedTx: boolean
+  hasUnconfirmedTx: boolean
+  status: string //'QUOTE' | 'INITIATED'
+  userAgent: string //userAgent version
+  swapExpiration: number
+  nodeSwapExpiration: number
+  fromRateUsd: number
+  toRateUsd: number
+  fromAmountUsd: number
+  toAmountUsd: number
+  fromCounterPartyAddress: string
+  toCounterPartyAddress: string
+  createdAt: string
+  updatedAt: string
+  totalAgentFeeUsd: number
+  totalUserFeeUsd: number
+  totalFeeUsd: number
+}
+
+export type RequestDataType = {
+  from: string
+  to: string
+  fromAmount: number
+  toAmount: number
+}
+
+export interface MergedQuoteType extends LockedQuoteType {
+  fromAddress: string
+  toAddress: string
+  fee: number
+  claimFee: number
+}
+
 export type TriggerType = 'onInit' | 'onAccountUpdate' | 'onMarketDataUpdate' | 'onFiatRatesUpdate'
 export type GasSpeedType = 'slow' | 'average' | 'fast'
 export type InitialStateType = {
@@ -390,7 +435,7 @@ export type SwapPayloadType = {
   claimFee: number
 }
 
-export type SwapTransactionType = {
+export interface SwapTransactionType extends LockedQuoteType {
   id: string
   from: string
   to: string

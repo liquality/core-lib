@@ -10,9 +10,12 @@ import {
 import {
   IAccount,
   IConfig,
+  LockedQuoteType,
   MarketDataType,
+  MergedQuoteType,
   NetworkEnum,
   QuoteType,
+  RequestDataType,
   SwapPayloadType,
   SwapProvidersEnum,
   SwapTransactionType,
@@ -29,51 +32,6 @@ export const VERSION_STRING = '1.9.1'
 // export const VERSION_STRING = `Wallet ${pkg.version} (CAL ${pkg.dependencies['@liquality/client']
 //   .replace('^', '')
 //   .replace('~', '')})`
-
-type LockedQuoteType = {
-  id: string
-  orderId: string
-  from: string
-  to: string
-  fromAmount: number
-  toAmount: number
-  rate: number
-  spread: number
-  minConf: number
-  expiresAt: number
-  hasAgentUnconfirmedTx: boolean
-  hasUserUnconfirmedTx: boolean
-  hasUnconfirmedTx: boolean
-  status: string //'QUOTE' | 'INITIATED'
-  userAgent: string //userAgent version
-  swapExpiration: number
-  nodeSwapExpiration: number
-  fromRateUsd: number
-  toRateUsd: number
-  fromAmountUsd: number
-  toAmountUsd: number
-  fromCounterPartyAddress: string
-  toCounterPartyAddress: string
-  createdAt: string
-  updatedAt: string
-  totalAgentFeeUsd: number
-  totalUserFeeUsd: number
-  totalFeeUsd: number
-}
-
-type RequestDataType = {
-  from: string
-  to: string
-  fromAmount: number
-  toAmount: number
-}
-
-interface MergedQuoteType extends LockedQuoteType {
-  fromAddress: string
-  toAddress: string
-  fee: number
-  claimFee: number
-}
 
 export default class LiqualitySwapProvider extends SwapProvider {
   private _activewalletId: string
@@ -170,7 +128,7 @@ export default class LiqualitySwapProvider extends SwapProvider {
     fromAccount: IAccount,
     toAccount: IAccount,
     quote: Partial<SwapPayloadType>
-  ): Promise<Partial<SwapTransactionType & LockedQuoteType>> {
+  ): Promise<Partial<SwapTransactionType>> {
     // Quote from the user
     const { from, to, fromAmount, toAmount } = quote
 
