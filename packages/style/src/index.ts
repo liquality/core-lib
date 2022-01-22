@@ -1,5 +1,1 @@
-enum Color {
-  BACKGROUND = '#fff'
-}
-
-export { Color }
+export * from './color'

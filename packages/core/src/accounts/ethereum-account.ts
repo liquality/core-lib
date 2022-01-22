@@ -180,12 +180,10 @@ export default class EthereumAccount implements IAccount {
     const { data } = await axios.get(`${this._config.getPriceFetcherUrl()}/simple/price`, {
       params: { vs_currencies: toCurrency, ids: coindIds.join(',') }
     })
-    const prices = Object.keys(data).reduce((acc: Record<string, number>, coinGeckoId) => {
+    return Object.keys(data).reduce((acc: Record<string, number>, coinGeckoId) => {
       acc[reverseMap[coinGeckoId]] = data[coinGeckoId][toCurrency.toLowerCase()]
       return acc
     }, {})
-
-    return prices
   }
 
   public async refresh(): Promise<AccountType> {
