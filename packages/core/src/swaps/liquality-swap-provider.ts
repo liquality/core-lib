@@ -26,6 +26,8 @@ import { sha256 } from '@liquality/crypto'
 import { prettyBalance } from '../utils/coin-formatter'
 import SwapProvider from './swap-provider'
 import { isERC20 } from '../utils'
+import IAtomicSwapProvider from './atomic-swap-provider'
+import LiqualityRuleEngine from '../rule-engine/liquality-rule-engine'
 
 //TODO find a different way to get the version
 export const VERSION_STRING = '1.9.1'
@@ -33,7 +35,7 @@ export const VERSION_STRING = '1.9.1'
 //   .replace('^', '')
 //   .replace('~', '')})`
 
-export default class LiqualitySwapProvider extends SwapProvider {
+export default class LiqualitySwapProvider extends SwapProvider implements IAtomicSwapProvider {
   private _activewalletId: string
   private _activeNetwork: NetworkEnum
   private _client: Client
@@ -207,7 +209,7 @@ export default class LiqualitySwapProvider extends SwapProvider {
       mergedQuote.fee
     )
 
-    return {
+    const swapTransaction: Partial<SwapTransactionType> = {
       ...mergedQuote,
       status: 'INITIATED',
       secret,
@@ -215,6 +217,16 @@ export default class LiqualitySwapProvider extends SwapProvider {
       fromFundHash: fromFundTx.hash,
       fromFundTx
     }
+
+    new LiqualityRuleEngine(
+      fromAccount,
+      toAccount,
+      this,
+      swapTransaction,
+      this._callbacks['onTransactionUpdate']
+    ).start()
+
+    return swapTransaction
   }
 
   public async estimateFees(
@@ -259,27 +271,268 @@ export default class LiqualitySwapProvider extends SwapProvider {
     }
   }
 
-  performNextSwapAction(network: NetworkEnum, walletId: string, swap: any) {
-    let updates
-    //TODO Implement a rules engine for this logic
-    switch (swap.status) {
-      case 'WAITING_FOR_APPROVE_CONFIRMATIONS':
-        // updates = await withInterval(async () => this.waitForApproveConfirmations({ swap, network, walletId }))
-        break
-      case 'APPROVE_CONFIRMED':
-        // updates = await withLock(store, { item: swap, network, walletId, asset: swap.from }, async () =>
-        //   this.sendSwap({ quote: swap, network, walletId })
-        // )
-        break
-      case 'WAITING_FOR_SWAP_CONFIRMATIONS':
-        // updates = await withInterval(async () => this.waitForSwapConfirmations({ swap, network, walletId }))
-        break
-    }
+  public async updateOrder(order: Partial<SwapTransactionType>) {
+    return axios({
+      url: this._config.getAgentUrl(this._activeNetwork, SwapProvidersEnum.LIQUALITY) + '/api/swap/order/' + order.id,
+      method: 'post',
+      data: {
+        fromAddress: order.fromAddress,
+        toAddress: order.toAddress,
+        fromFundHash: order.fromFundHash,
+        secretHash: order.secretHash
+      },
+      headers: {
+        'x-requested-with': VERSION_STRING,
+        'x-liquality-user-agent': VERSION_STRING
+      }
+    }).then((res) => res.data)
+  }
 
-    return updates
+  public async findCounterPartyInitiation(toAccount: IAccount, swap: Partial<SwapTransactionType>) {
+    const toClient = await this.getClient(toAccount, swap)
+
+    try {
+      const tx = await toClient.swap.findInitiateSwapTransaction({
+        value: new BigNumber(swap.toAmount),
+        recipientAddress: swap.toAddress,
+        refundAddress: swap.toCounterPartyAddress,
+        secretHash: swap.secretHash,
+        expiration: swap.nodeSwapExpiration
+      })
+
+      if (tx) {
+        const toFundHash = tx.hash
+        const isVerified = await toClient.swap.verifyInitiateSwapTransaction(
+          {
+            value: new BigNumber(swap.toAmount),
+            recipientAddress: swap.toAddress,
+            refundAddress: swap.toCounterPartyAddress,
+            secretHash: swap.secretHash,
+            expiration: swap.nodeSwapExpiration
+          },
+          toFundHash
+        )
+
+        // ERC20 swaps have separate funding tx. Ensures funding tx has enough confirmations
+        const fundingTransaction = await toClient.swap.findFundSwapTransaction(
+          {
+            value: new BigNumber(swap.toAmount),
+            recipientAddress: swap.toAddress,
+            refundAddress: swap.toCounterPartyAddress,
+            secretHash: swap.secretHash,
+            expiration: swap.nodeSwapExpiration
+          },
+          toFundHash
+        )
+        const fundingConfirmed = fundingTransaction
+          ? fundingTransaction.confirmations >= chains[cryptoassets[swap.to].chain].safeConfirmations
+          : true
+
+        if (isVerified && fundingConfirmed) {
+          return {
+            toFundHash,
+            status: 'CONFIRM_COUNTER_PARTY_INITIATION'
+          }
+        }
+      }
+    } catch (e) {
+      if (['BlockNotFoundError', 'PendingTxError', 'TxNotFoundError'].includes(e.name)) console.warn(e)
+      else throw e
+    }
+  }
+
+  public async confirmInitiation(fromAccount: IAccount, toAccount: IAccount, swap: Partial<SwapTransactionType>) {
+    // Jump the step if counter party has already accepted the initiation
+    const counterPartyInitiation = await this.findCounterPartyInitiation(toAccount, swap)
+    if (counterPartyInitiation) return counterPartyInitiation
+
+    const fromClient = await this.getClient(fromAccount, swap)
+
+    try {
+      const tx = await fromClient.chain.getTransactionByHash(swap.fromFundHash)
+
+      if (tx) console.log('confirmations:', tx.confirmations)
+      if (tx && tx.confirmations > 0) {
+        return {
+          status: 'INITIATION_CONFIRMED'
+        }
+      } else {
+        return null
+      }
+    } catch (e) {
+      if (e.name === 'TxNotFoundError') console.warn(e)
+      else throw e
+    }
+  }
+
+  public async confirmCounterPartyInitiation(toAccount: IAccount, swap: Partial<SwapTransactionType>) {
+    const toClient = await this.getClient(toAccount, swap)
+    const tx = await toClient.chain.getTransactionByHash(swap.toFundHash)
+
+    if (tx && tx.confirmations >= chains[cryptoassets[swap.to].chain].safeConfirmations) {
+      return {
+        status: 'READY_TO_CLAIM'
+      }
+    }
+  }
+
+  public async fundSwap(fromAccount: IAccount, swap: Partial<SwapTransactionType>) {
+    if (!isERC20(swap.from)) return { status: 'FUNDED' } // Skip. Only ERC20 swaps need funding
+
+    const fromClient = await this.getClient(fromAccount, swap)
+
+    const fundTx = await fromClient.swap.fundSwap(
+      {
+        value: new BigNumber(swap.fromAmount),
+        recipientAddress: swap.fromCounterPartyAddress,
+        refundAddress: swap.fromAddress,
+        secretHash: swap.secretHash,
+        expiration: swap.swapExpiration
+      },
+      swap.fromFundHash,
+      swap.fee
+    )
+
+    return {
+      fundTxHash: fundTx.hash,
+      status: 'FUNDED'
+    }
+  }
+
+  public async claimSwap(toAccount: IAccount, swap: Partial<SwapTransactionType>) {
+    const toClient = await this.getClient(toAccount, swap)
+
+    const toClaimTx = await toClient.swap.claimSwap(
+      {
+        value: new BigNumber(swap.toAmount),
+        recipientAddress: swap.toAddress,
+        refundAddress: swap.toCounterPartyAddress,
+        secretHash: swap.secretHash,
+        expiration: swap.nodeSwapExpiration
+      },
+      swap.toFundHash,
+      swap.secret,
+      swap.claimFee
+    )
+
+    return {
+      toClaimHash: toClaimTx.hash,
+      toClaimTx,
+      status: 'WAITING_FOR_CLAIM_CONFIRMATIONS'
+    }
+  }
+
+  public async waitForClaimConfirmations(toAccount: IAccount, swap: Partial<SwapTransactionType>) {
+    const toClient = await this.getClient(toAccount, swap)
+
+    try {
+      const tx = await toClient.chain.getTransactionByHash(swap.toClaimHash)
+
+      if (tx && tx.confirmations > 0) {
+        // Dispatch to update balances
+        return {
+          endTime: Date.now(),
+          status: 'SUCCESS'
+        }
+      }
+    } catch (e) {
+      if (e.name === 'TxNotFoundError') console.warn(e)
+      else throw e
+    }
+  }
+
+  public async hasSwapExpired(fromAccount: IAccount, swap: Partial<SwapTransactionType>): Promise<boolean> {
+    const client = await this.getClient(fromAccount, swap)
+    const blockNumber = await client.chain.getBlockHeight()
+    const latestBlock = await client.chain.getBlockByNumber(blockNumber)
+    return latestBlock.timestamp > swap.swapExpiration
+  }
+
+  public async waitForRefund(fromAccount: IAccount, swap: Partial<SwapTransactionType>): Promise<boolean> {
+    const client = await this.getClient(fromAccount, swap)
+    const MAX_TRIES = 3
+    let tries = 0
+    const promise = new Promise<boolean>((resolve, reject) => {
+      const interval = setInterval(async () => {
+        try {
+          const blockNumber = await client.chain.getBlockHeight()
+          const latestBlock = await client.chain.getBlockByNumber(blockNumber)
+          tries++
+          if (latestBlock.timestamp > swap.swapExpiration) {
+            clearInterval(interval)
+            resolve(true)
+          }
+          if (tries >= MAX_TRIES) {
+            clearInterval(interval)
+          }
+        } catch (e) {
+          console.warn(e)
+          reject(e.message)
+        }
+      }, 2000)
+    })
+
+    return await promise
+  }
+
+  public async refundSwap(
+    account: IAccount,
+    swap: Partial<SwapTransactionType>
+  ): Promise<Partial<SwapTransactionType>> {
+    const fromClient = await this.getClient(account, swap)
+
+    const refundTx = await fromClient.swap.refundSwap(
+      {
+        value: new BigNumber(swap.fromAmount),
+        recipientAddress: swap.fromCounterPartyAddress,
+        refundAddress: swap.fromAddress,
+        secretHash: swap.secretHash,
+        expiration: swap.swapExpiration
+      },
+      swap.fromFundHash,
+      swap.fee
+    )
+
+    return {
+      refundHash: refundTx.hash,
+      status: 'WAITING_FOR_REFUND_CONFIRMATIONS'
+    }
+  }
+
+  public async waitForRefundConfirmations(fromAccount: IAccount, swap: Partial<SwapTransactionType>) {
+    const fromClient = await this.getClient(fromAccount, swap)
+    try {
+      const tx = await fromClient.chain.getTransactionByHash(swap.refundHash)
+
+      if (tx && tx.confirmations > 0) {
+        return {
+          endTime: Date.now(),
+          status: 'REFUNDED'
+        }
+      } else {
+        return null
+      }
+    } catch (e) {
+      if (e.name === 'TxNotFoundError') console.warn(e)
+      else throw e
+    }
   }
 
   //Helper methods
+  private async getClient(account: IAccount, swap: Partial<SwapTransactionType>): Promise<Client> {
+    const assets = await account.getAssets()
+    const client =
+      assets.length === 0
+        ? account.getClient()
+        : assets.filter((asset) => asset.getSymbol() === swap.from)[0].getClient()
+
+    if (!client) {
+      throw new Error('No compatible client found.')
+    }
+
+    return client
+  }
+
   private getTxFee(units, _asset, _feePrice): BigNumber {
     const chainId = cryptoassets[_asset].chain
     const nativeAsset = chains[chainId].nativeAsset

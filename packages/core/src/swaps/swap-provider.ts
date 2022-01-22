@@ -1,12 +1,4 @@
-import {
-  IAccount,
-  IConfig,
-  MarketDataType,
-  NetworkEnum,
-  QuoteType,
-  SwapPayloadType,
-  SwapTransactionType
-} from '../types'
+import { IAccount, IConfig, MarketDataType, QuoteType, SwapPayloadType, SwapTransactionType } from '../types'
 import { BigNumber } from '@liquality/types'
 
 type TransactionStatusType = {
@@ -69,15 +61,6 @@ abstract class SwapProvider {
     feePrices: number[],
     max?: number
   ): Promise<Record<number, BigNumber>>
-
-  /**
-   * This hook is called when state updates are required
-   * @param network
-   * @param walletId
-   * @param swap
-   * @return updates An object representing updates to the current swap in the history
-   */
-  abstract performNextSwapAction(network: NetworkEnum, walletId: string, swap: any)
 
   public get statuses() {
     return this._statuses

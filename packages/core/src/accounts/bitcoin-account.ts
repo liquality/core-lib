@@ -7,6 +7,8 @@ import { BitcoinEsploraBatchApiProvider } from '@liquality/bitcoin-esplora-batch
 import { BitcoinJsWalletProvider } from '@liquality/bitcoin-js-wallet-provider'
 import { BitcoinRpcFeeProvider } from '@liquality/bitcoin-rpc-fee-provider'
 import { BitcoinFeeApiProvider } from '@liquality/bitcoin-fee-api-provider'
+import { BitcoinSwapProvider } from '@liquality/bitcoin-swap-provider'
+import { BitcoinEsploraSwapFindProvider } from '@liquality/bitcoin-esplora-swap-find-provider'
 
 const ASSET = 'BTC'
 
@@ -171,6 +173,8 @@ export default class BitcoinAccount implements IAccount {
     //TODO fix this issue in the original repo
     // @ts-ignore
     btcClient.addProvider(new BitcoinJsWalletProvider(options))
+    btcClient.addProvider(new BitcoinSwapProvider({ network: bitcoinNetwork }))
+    btcClient.addProvider(new BitcoinEsploraSwapFindProvider(esploraApi))
 
     if (isTestnet) {
       btcClient.addProvider(new BitcoinRpcFeeProvider())

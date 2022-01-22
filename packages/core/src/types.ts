@@ -365,7 +365,12 @@ export interface MergedQuoteType extends LockedQuoteType {
   claimFee: number
 }
 
-export type TriggerType = 'onInit' | 'onAccountUpdate' | 'onMarketDataUpdate' | 'onFiatRatesUpdate'
+export type TriggerType =
+  | 'onInit'
+  | 'onAccountUpdate'
+  | 'onMarketDataUpdate'
+  | 'onFiatRatesUpdate'
+  | 'onTransactionUpdate'
 export type GasSpeedType = 'slow' | 'average' | 'fast'
 export type InitialStateType = {
   activeWalletId: string
@@ -435,7 +440,7 @@ export type SwapPayloadType = {
   claimFee: number
 }
 
-export interface SwapTransactionType extends LockedQuoteType {
+export interface SwapTransactionType extends MergedQuoteType {
   id: string
   from: string
   to: string
@@ -449,6 +454,12 @@ export interface SwapTransactionType extends LockedQuoteType {
   fromFundHash: string
   fromFundTx: Transaction
   slippage: number
+  toFundHash?: string
+  toClaimHash?: string
+  fundTxHash?: string
+  toClaimTx?: Transaction
+  refundHash?: string
+  endTime?: number
 }
 
 // helper to get the type of an array element
@@ -458,6 +469,17 @@ export interface FlatState {
   assetCount: number
   totalBalance: BigNumber
   totalBalanceInFiat: BigNumber
+}
+
+export type HistoryItem = {
+  id: string
+  type: 'SWAP' | 'SEND' | 'RECEIVE'
+  from: string
+  to?: string
+  toFundHash?: string
+  fromAmount: number
+  status: string
+  totalSteps: number
 }
 
 export interface StateType {
@@ -497,7 +519,7 @@ export interface StateType {
       }
     >
   >
-  history?: unknown
+  history?: HistoryItem[]
   marketData?: MarketDataType[]
   activeNetwork?: NetworkEnum
   activeWalletId?: string
