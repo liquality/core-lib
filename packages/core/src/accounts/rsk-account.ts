@@ -1,4 +1,4 @@
-import { AccountType, Hardware, IAccount, IAsset, IConfig, Mnemonic, StateType } from '../types'
+import { AccountType, Hardware, IAccount, IAsset, IConfig, Mnemonic, StateType, TriggerType } from '../types'
 import { ChainId, assets as cryptoassets, chains, isEthereumChain } from '@liquality/cryptoassets'
 import { NetworkEnum } from '../types'
 import { Client } from '@liquality/client'
@@ -21,9 +21,9 @@ export default class RSKAccount implements IAccount {
   private _derivationPath: string
   private _address: Address
   private _assets: IAsset[]
-  private _balance: BigNumber
   private _config: IConfig
   private _at: number
+  private _callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>
 
   constructor(
     config: IConfig,
@@ -32,6 +32,7 @@ export default class RSKAccount implements IAccount {
     chain: ChainId,
     network: NetworkEnum,
     assetSymbols: string[],
+    callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>,
     hardware?: Hardware
   ) {
     if (!mnemonic) {
@@ -47,6 +48,7 @@ export default class RSKAccount implements IAccount {
     this._hardware = hardware
     this._at = Date.now()
     this._assets = []
+    this._callbacks = callbacks
     this._derivationPath = this.calculateDerivationPath()
     this._client = this.createEthereumClient()
   }
@@ -93,9 +95,9 @@ export default class RSKAccount implements IAccount {
       .map((asset) => {
         if (asset && cryptoassets[asset]?.type === 'erc20') {
           const client = this.createEthereumClient(asset)
-          return new Asset(asset, this._address.address, client)
+          return new Asset(asset, this._address.address, client, this._callbacks)
         }
-        return new Asset(asset, this._address.address, this._client)
+        return new Asset(asset, this._address.address, this._client, this._callbacks)
       })
     return this._assets
   }

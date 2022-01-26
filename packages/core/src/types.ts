@@ -319,6 +319,12 @@ export interface ISwapProvider {
     max: number
   ): Promise<Record<number, BigNumber>>
 }
+
+export interface IRuleEngine {
+  getTotalSteps(): number
+  start(): Promise<void>
+}
+
 //-----------------------------------DATA TYPES----------------------------
 export type LockedQuoteType = {
   id: string
@@ -473,13 +479,17 @@ export interface FlatState {
 
 export type HistoryItem = {
   id: string
-  type: 'SWAP' | 'SEND' | 'RECEIVE'
+  network?: NetworkEnum //TODO we might need this when the user changes the network before the transaction completes
+  walletId?: string
+  to: string
   from: string
-  to?: string
-  toFundHash?: string
-  fromAmount: number
-  status: string
+  toAddress: string
+  startTime: number
+  type: 'SWAP' | 'SEND' | 'RECEIVE'
+  sendTransaction?: Transaction
+  swapTransaction?: Partial<SwapTransactionType>
   totalSteps: number
+  currentStep: number
 }
 
 export interface StateType {

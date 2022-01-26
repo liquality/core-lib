@@ -96,7 +96,8 @@ export default class Wallet implements IWallet<StateType> {
         [NetworkEnum.Mainnet]: {
           [walletId]: this._config.getDefaultEnabledAssets(NetworkEnum.Mainnet)
         }
-      }
+      },
+      history: []
     }
 
     walletState.encryptedWallets = await this._encryption.encrypt(
@@ -172,7 +173,15 @@ export default class Wallet implements IWallet<StateType> {
     if (hardware) return
     const accountKey = `${chain}-${network}`
     if (this._accounts[accountKey]) return this._accounts[accountKey]
-    const account: IAccount = this.accountFactory(this._config, this._mnemonic, 0, chain, network, [])
+    const account: IAccount = Wallet.accountFactory(
+      this._config,
+      this._mnemonic,
+      0,
+      chain,
+      network,
+      [],
+      this._callbacks
+    )
     const walletAccount = await account.build()
     this._accounts[accountKey] = account
     if (this._callback) this._callback(walletAccount)
@@ -248,21 +257,22 @@ export default class Wallet implements IWallet<StateType> {
     return validateMnemonic(seedPhrase)
   }
 
-  private accountFactory(
+  private static accountFactory(
     config: IConfig,
     mnemonic: Mnemonic,
     index: number,
     chain: ChainId,
     network: NetworkEnum,
-    assets: string[]
+    assets: string[],
+    callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>
   ) {
     switch (chain) {
       case ChainId.Ethereum:
-        return new EthereumAccount(config, mnemonic, index, chain, network, assets)
+        return new EthereumAccount(config, mnemonic, index, chain, network, assets, callbacks)
       case ChainId.Bitcoin:
-        return new BitcoinAccount(config, mnemonic, index, chain, network, assets)
+        return new BitcoinAccount(config, mnemonic, index, chain, network, assets, callbacks)
       case ChainId.Rootstock:
-        return new RSKAccount(config, mnemonic, index, chain, network, assets)
+        return new RSKAccount(config, mnemonic, index, chain, network, assets, callbacks)
     }
   }
 }

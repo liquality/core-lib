@@ -1,19 +1,25 @@
-import { IAsset, Token } from './types'
+import { HistoryItem, IAsset, TriggerType } from './types'
 import { BigNumber, SendOptions, Transaction } from '@liquality/types'
 import { Client } from '@liquality/client'
 import { isEthereumChain, assets as cryptoassets } from '@liquality/cryptoassets'
+import { v4 as uuidv4 } from 'uuid'
 
 export default class Asset implements IAsset {
-  _balance: BigNumber
-  _symbol: string
-  _type: Token
-  _address: string
-  _client: Client
+  private readonly _symbol: string
+  private readonly _address: string
+  private readonly _client: Client
+  private readonly _callbacks: Partial<Record<TriggerType, (historyItem: HistoryItem) => void>>
 
-  constructor(symbol: string, address: string, client: Client) {
+  constructor(
+    symbol: string,
+    address: string,
+    client: Client,
+    callbacks: Partial<Record<TriggerType, (historyItem: HistoryItem) => void>>
+  ) {
     this._symbol = symbol
     this._address = address
     this._client = client
+    this._callbacks = callbacks
   }
 
   public getAddress(): string {
@@ -34,7 +40,19 @@ export default class Asset implements IAsset {
   }
 
   public async transmit(options: SendOptions): Promise<Transaction> {
-    return await this._client.chain.sendTransaction(options)
+    const transaction = await this._client.chain.sendTransaction(options)
+    this._callbacks['onTransactionUpdate']?.({
+      id: uuidv4(),
+      sendTransaction: transaction,
+      startTime: Date.now(),
+      from: this._symbol,
+      to: this._symbol,
+      toAddress: typeof options.to === 'string' ? options.to : options.to.address,
+      totalSteps: 2,
+      currentStep: 1,
+      type: 'SEND'
+    })
+    return transaction
   }
 
   public getClient(): Client {

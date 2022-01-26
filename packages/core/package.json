@@ -51,6 +51,7 @@
     "ethers": "^5.4.1",
     "json-rules-engine": "^6.1.2",
     "tslib": "^2.3.1",
-    "uuid": "^8.3.2"
+    "uuid": "^8.3.2",
+    "async-mutex": "^0.3.2"
   }
 }

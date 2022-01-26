@@ -28,6 +28,7 @@ import SwapProvider from './swap-provider'
 import { isERC20 } from '../utils'
 import IAtomicSwapProvider from './atomic-swap-provider'
 import LiqualityRuleEngine from '../rule-engine/liquality-rule-engine'
+import { Mutex } from 'async-mutex'
 
 //TODO find a different way to get the version
 export const VERSION_STRING = '1.9.1'
@@ -40,9 +41,8 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
   private _activeNetwork: NetworkEnum
   private _client: Client
   private _provider: SwapProvidersEnum
-  private _swapFromAddress: string
-  private _swapToAddress: string
-  private _callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>
+  private readonly _callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>
+  private _mutex: Mutex
 
   /**
    *
@@ -63,6 +63,7 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
     this._activeNetwork = activeNetwork
     this._provider = SwapProvidersEnum.LIQUALITY
     this._callbacks = callbacks
+    this._mutex = new Mutex()
 
     //Fetch market data
     this.getSupportedPairs().then((pairs) => {
@@ -218,13 +219,16 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
       fromFundTx
     }
 
-    new LiqualityRuleEngine(
-      fromAccount,
-      toAccount,
-      this,
-      swapTransaction,
-      this._callbacks['onTransactionUpdate']
-    ).start()
+    //Makes sure we can only run one instance of the rule engine at any given time for a given swap provider
+    this._mutex.runExclusive(() => {
+      new LiqualityRuleEngine(
+        fromAccount,
+        toAccount,
+        this,
+        swapTransaction,
+        this._callbacks['onTransactionUpdate']
+      ).start()
+    })
 
     return swapTransaction
   }
@@ -351,7 +355,6 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
     try {
       const tx = await fromClient.chain.getTransactionByHash(swap.fromFundHash)
 
-      if (tx) console.log('confirmations:', tx.confirmations)
       if (tx && tx.confirmations > 0) {
         return {
           status: 'INITIATION_CONFIRMED'

@@ -1,4 +1,14 @@
-import { AccountType, Hardware, IAccount, IAsset, IConfig, Mnemonic, NetworkEnum, StateType } from '../types'
+import {
+  AccountType,
+  Hardware,
+  IAccount,
+  IAsset,
+  IConfig,
+  Mnemonic,
+  NetworkEnum,
+  StateType,
+  TriggerType
+} from '../types'
 import { ChainId, chains, assets as cryptoassets } from '@liquality/cryptoassets'
 import { Client } from '@liquality/client'
 import { Address, BigNumber, bitcoin, FeeDetails } from '@liquality/types'
@@ -26,6 +36,7 @@ export default class BitcoinAccount implements IAccount {
   private _balance: BigNumber
   private _config: IConfig
   private _at: number
+  private _callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>
 
   constructor(
     config: IConfig,
@@ -34,6 +45,7 @@ export default class BitcoinAccount implements IAccount {
     chain: ChainId,
     network: NetworkEnum,
     assetSymbols: string[],
+    callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>,
     hardware?: Hardware
   ) {
     if (!mnemonic) {
@@ -50,6 +62,7 @@ export default class BitcoinAccount implements IAccount {
     this._at = Date.now()
     this._assets = []
     this._derivationPath = this.calculateDerivationPath()
+    this._callbacks = callbacks
     this._client = this.createBtcClient()
   }
 
