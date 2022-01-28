@@ -16,10 +16,12 @@ import {
   QuoteType,
   SwapPayloadType,
   SwapProvidersEnum,
-  SwapTransactionType
+  SwapTransactionType,
+  TriggerType
 } from '../types'
 import { isERC20 } from '../utils'
 import { BigNumber, SendOptions } from '@liquality/types'
+import { Mutex } from 'async-mutex'
 
 // use WRBTC address for RBTC native token
 const wrappedRbtcAddress = {
@@ -42,14 +44,23 @@ class SovrynSwapProvider extends SwapProvider {
   private _activeNetwork: NetworkEnum
   private _activeWalletId: string
   private _provider: SwapProvidersEnum
+  private _mutex: Mutex
+  private readonly _callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>
 
-  constructor(config: IConfig, activeNetwork: NetworkEnum, activeWalletId: string) {
+  constructor(
+    config: IConfig,
+    activeNetwork: NetworkEnum,
+    activeWalletId: string,
+    callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>
+  ) {
     super()
     this._config = config
     this._apiCache = {} // chainId to RPC provider
     this._activeNetwork = activeNetwork
     this._activeWalletId = activeWalletId
     this._provider = SwapProvidersEnum.SOVRYN
+    this._callbacks = callbacks
+    this._mutex = new Mutex()
   }
 
   public async getSupportedPairs() {
@@ -103,6 +114,24 @@ class SovrynSwapProvider extends SwapProvider {
       fee: quote.fee,
       slippage: 50,
       ...updates
+    }
+  }
+
+  public runRulesEngine(fromAccount: IAccount, toAccount: IAccount, swapTransaction: Partial<SwapTransactionType>) {
+    if (!this._mutex.isLocked()) {
+      console.log(fromAccount, toAccount, swapTransaction)
+      //Makes sure we can only run one instance of the rule engine at any given time for a given swap provider
+      // this._mutex.runExclusive(() => {
+      //   new LiqualityRuleEngine(
+      //     fromAccount,
+      //     toAccount,
+      //     this,
+      //     swapTransaction,
+      //     this._callbacks['onTransactionUpdate']
+      //   ).start()
+      // })
+    } else {
+      throw new Error('Rules Engine already running for this provider')
     }
   }
 

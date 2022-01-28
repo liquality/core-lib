@@ -234,7 +234,8 @@ export default class Wallet implements IWallet<StateType> {
       this._swapProviders[swapProviderType] = new SovrynSwapProvider(
         this._config,
         this._activeNetwork,
-        this._activeWalletId
+        this._activeWalletId,
+        this._callbacks
       )
     }
 

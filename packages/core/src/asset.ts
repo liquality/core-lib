@@ -39,9 +39,9 @@ export default class Asset implements IAsset {
     return Promise.resolve([])
   }
 
-  public async transmit(options: SendOptions): Promise<Transaction> {
+  public async transmit(options: SendOptions): Promise<HistoryItem> {
     const transaction = await this._client.chain.sendTransaction(options)
-    this._callbacks['onTransactionUpdate']?.({
+    const historyItem: HistoryItem = {
       id: uuidv4(),
       sendTransaction: transaction,
       startTime: Date.now(),
@@ -51,8 +51,9 @@ export default class Asset implements IAsset {
       totalSteps: 2,
       currentStep: 1,
       type: 'SEND'
-    })
-    return transaction
+    }
+    this._callbacks['onTransactionUpdate']?.(historyItem)
+    return historyItem
   }
 
   public getClient(): Client {

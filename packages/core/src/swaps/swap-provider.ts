@@ -1,12 +1,13 @@
-import { IAccount, IConfig, MarketDataType, QuoteType, SwapPayloadType, SwapTransactionType } from '../types'
+import {
+  IAccount,
+  IConfig,
+  MarketDataType,
+  QuoteType,
+  SwapPayloadType,
+  SwapTransactionType,
+  TransactionStatusType
+} from '../types'
 import { BigNumber } from '@liquality/types'
-
-type TransactionStatusType = {
-  step: number
-  label: string
-  filterStatus: string
-  notification?: (...args: unknown[]) => Record<string, string>
-}
 
 abstract class SwapProvider {
   protected _config: IConfig
@@ -43,6 +44,14 @@ abstract class SwapProvider {
     toAccount: IAccount,
     quote: Partial<SwapPayloadType>
   ): Promise<Partial<SwapTransactionType>>
+
+  /**
+   * Start the rules engine that executes the swaps
+   * @param fromAccount
+   * @param toAccount
+   * @param swapTransaction
+   */
+  abstract runRulesEngine(fromAccount: IAccount, toAccount: IAccount, swapTransaction: Partial<SwapTransactionType>)
 
   /**
    * Estimate the fees for the given parameters

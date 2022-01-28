@@ -294,7 +294,7 @@ export interface IAsset {
    * @param options the payload information necessary to perform the transaction
    * @returns return a transaction object
    */
-  transmit(options: SendOptions): Promise<Transaction>
+  transmit(options: SendOptions): Promise<HistoryItem>
 
   /**
    * Fetches past transactions
@@ -457,15 +457,23 @@ export interface SwapTransactionType extends MergedQuoteType {
   status: string
   secret: string
   secretHash: string
+  slippage: number
   fromFundHash: string
   fromFundTx: Transaction
-  slippage: number
   toFundHash?: string
+  toFundTx?: Transaction
   toClaimHash?: string
-  fundTxHash?: string
   toClaimTx?: Transaction
+  fundTxHash?: string //specific to ERC20
   refundHash?: string
   endTime?: number
+}
+
+export type TransactionStatusType = {
+  step: number
+  label: string
+  filterStatus: string
+  notification?: (...args: unknown[]) => Record<string, string>
 }
 
 // helper to get the type of an array element

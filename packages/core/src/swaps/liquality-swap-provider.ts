@@ -219,18 +219,26 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
       fromFundTx
     }
 
-    //Makes sure we can only run one instance of the rule engine at any given time for a given swap provider
-    this._mutex.runExclusive(() => {
-      new LiqualityRuleEngine(
-        fromAccount,
-        toAccount,
-        this,
-        swapTransaction,
-        this._callbacks['onTransactionUpdate']
-      ).start()
-    })
+    this.runRulesEngine(fromAccount, toAccount, swapTransaction)
 
     return swapTransaction
+  }
+
+  public runRulesEngine(fromAccount: IAccount, toAccount: IAccount, swapTransaction: Partial<SwapTransactionType>) {
+    if (!this._mutex.isLocked()) {
+      //Makes sure we can only run one instance of the rule engine at any given time for a given swap provider
+      this._mutex.runExclusive(() => {
+        new LiqualityRuleEngine(
+          fromAccount,
+          toAccount,
+          this,
+          swapTransaction,
+          this._callbacks['onTransactionUpdate']
+        ).start()
+      })
+    } else {
+      throw new Error('Rules Engine already running for this provider')
+    }
   }
 
   public async estimateFees(
@@ -374,7 +382,8 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
 
     if (tx && tx.confirmations >= chains[cryptoassets[swap.to].chain].safeConfirmations) {
       return {
-        status: 'READY_TO_CLAIM'
+        status: 'READY_TO_CLAIM',
+        toFundTx: tx
       }
     }
   }
