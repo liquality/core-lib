@@ -266,6 +266,13 @@ export interface IAccount {
   refresh(): Promise<AccountType>
 
   getClient(): Client
+
+  /**
+   * Speeds up an already submitted transaction
+   * @param transaction
+   * @param newFee
+   */
+  speedUpTransaction(transaction: string | Transaction, newFee: number): Promise<Transaction>
 }
 
 export interface IAsset {
@@ -295,6 +302,12 @@ export interface IAsset {
    * @returns return a transaction object
    */
   transmit(options: SendOptions): Promise<HistoryItem>
+
+  /**
+   * Starts a rule engine that will keep track of the transactions until it is confirmed
+   * @param transaction
+   */
+  runRulesEngine(transaction: Transaction): void
 
   /**
    * Fetches past transactions
@@ -489,15 +502,18 @@ export type HistoryItem = {
   id: string
   network?: NetworkEnum //TODO we might need this when the user changes the network before the transaction completes
   walletId?: string
-  to: string
   from: string
+  to: string
+  fromAddress: string
   toAddress: string
   startTime: number
+  endTime?: number
   type: 'SWAP' | 'SEND' | 'RECEIVE'
   sendTransaction?: Transaction
   swapTransaction?: Partial<SwapTransactionType>
   totalSteps: number
   currentStep: number
+  status: string
 }
 
 export interface StateType {

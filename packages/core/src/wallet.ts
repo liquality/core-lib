@@ -191,7 +191,9 @@ export default class Wallet implements IWallet<StateType> {
   public async addAccounts(network: NetworkEnum, hardware?: Hardware): Promise<AccountMapping> {
     if (hardware) return
     for (const chain of this._config.getDefaultEnabledChains(network)) {
-      await this.addAccount(chain, network)
+      await this.addAccount(chain, network).catch((error) => {
+        console.log(`addAccounts:${chain} ${error}`)
+      })
     }
 
     return this._accounts

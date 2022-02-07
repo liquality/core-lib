@@ -301,7 +301,7 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
   }
 
   public async findCounterPartyInitiation(toAccount: IAccount, swap: Partial<SwapTransactionType>) {
-    const toClient = await this.getClient(toAccount, swap)
+    const toClient = await this.getClient(toAccount, false, swap)
 
     try {
       const tx = await toClient.swap.findInitiateSwapTransaction({
@@ -358,7 +358,7 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
     const counterPartyInitiation = await this.findCounterPartyInitiation(toAccount, swap)
     if (counterPartyInitiation) return counterPartyInitiation
 
-    const fromClient = await this.getClient(fromAccount, swap)
+    const fromClient = await this.getClient(fromAccount, true, swap)
 
     try {
       const tx = await fromClient.chain.getTransactionByHash(swap.fromFundHash)
@@ -377,7 +377,7 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
   }
 
   public async confirmCounterPartyInitiation(toAccount: IAccount, swap: Partial<SwapTransactionType>) {
-    const toClient = await this.getClient(toAccount, swap)
+    const toClient = await this.getClient(toAccount, false, swap)
     const tx = await toClient.chain.getTransactionByHash(swap.toFundHash)
 
     if (tx && tx.confirmations >= chains[cryptoassets[swap.to].chain].safeConfirmations) {
@@ -391,7 +391,7 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
   public async fundSwap(fromAccount: IAccount, swap: Partial<SwapTransactionType>) {
     if (!isERC20(swap.from)) return { status: 'FUNDED' } // Skip. Only ERC20 swaps need funding
 
-    const fromClient = await this.getClient(fromAccount, swap)
+    const fromClient = await this.getClient(fromAccount, true, swap)
 
     const fundTx = await fromClient.swap.fundSwap(
       {
@@ -412,7 +412,7 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
   }
 
   public async claimSwap(toAccount: IAccount, swap: Partial<SwapTransactionType>) {
-    const toClient = await this.getClient(toAccount, swap)
+    const toClient = await this.getClient(toAccount, false, swap)
 
     const toClaimTx = await toClient.swap.claimSwap(
       {
@@ -435,7 +435,7 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
   }
 
   public async waitForClaimConfirmations(toAccount: IAccount, swap: Partial<SwapTransactionType>) {
-    const toClient = await this.getClient(toAccount, swap)
+    const toClient = await this.getClient(toAccount, false, swap)
 
     try {
       const tx = await toClient.chain.getTransactionByHash(swap.toClaimHash)
@@ -454,14 +454,14 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
   }
 
   public async hasSwapExpired(fromAccount: IAccount, swap: Partial<SwapTransactionType>): Promise<boolean> {
-    const client = await this.getClient(fromAccount, swap)
+    const client = await this.getClient(fromAccount, true, swap)
     const blockNumber = await client.chain.getBlockHeight()
     const latestBlock = await client.chain.getBlockByNumber(blockNumber)
     return latestBlock.timestamp > swap.swapExpiration
   }
 
   public async waitForRefund(fromAccount: IAccount, swap: Partial<SwapTransactionType>): Promise<boolean> {
-    const client = await this.getClient(fromAccount, swap)
+    const client = await this.getClient(fromAccount, true, swap)
     const MAX_TRIES = 3
     let tries = 0
     const promise = new Promise<boolean>((resolve, reject) => {
@@ -491,7 +491,7 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
     account: IAccount,
     swap: Partial<SwapTransactionType>
   ): Promise<Partial<SwapTransactionType>> {
-    const fromClient = await this.getClient(account, swap)
+    const fromClient = await this.getClient(account, true, swap)
 
     const refundTx = await fromClient.swap.refundSwap(
       {
@@ -512,7 +512,7 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
   }
 
   public async waitForRefundConfirmations(fromAccount: IAccount, swap: Partial<SwapTransactionType>) {
-    const fromClient = await this.getClient(fromAccount, swap)
+    const fromClient = await this.getClient(fromAccount, true, swap)
     try {
       const tx = await fromClient.chain.getTransactionByHash(swap.refundHash)
 
@@ -531,12 +531,12 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
   }
 
   //Helper methods
-  private async getClient(account: IAccount, swap: Partial<SwapTransactionType>): Promise<Client> {
+  private async getClient(account: IAccount, from: boolean, swap: Partial<SwapTransactionType>): Promise<Client> {
     const assets = await account.getAssets()
     const client =
       assets.length === 0
         ? account.getClient()
-        : assets.filter((asset) => asset.getSymbol() === swap.from)[0].getClient()
+        : assets.filter((asset) => asset.getSymbol() === (from ? swap.from : swap.to))[0].getClient()
 
     if (!client) {
       throw new Error('No compatible client found.')
@@ -591,7 +591,7 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
     return {
       INITIATED: {
         step: 0,
-        label: 'Locking {from}',
+        label: `Locking {from}`,
         filterStatus: 'PENDING'
       },
       INITIATION_REPORTED: {

@@ -2,7 +2,7 @@ import { AccountType, Hardware, IAccount, IAsset, IConfig, Mnemonic, StateType, 
 import { ChainId, assets as cryptoassets, chains, isEthereumChain } from '@liquality/cryptoassets'
 import { NetworkEnum } from '../types'
 import { Client } from '@liquality/client'
-import { Address, BigNumber, FeeDetails } from '@liquality/types'
+import { Address, BigNumber, FeeDetails, Transaction } from '@liquality/types'
 import { EthereumRpcFeeProvider } from '@liquality/ethereum-rpc-fee-provider'
 import { EthereumRpcProvider } from '@liquality/ethereum-rpc-provider'
 import { EthereumJsWalletProvider } from '@liquality/ethereum-js-wallet-provider'
@@ -185,6 +185,10 @@ export default class RSKAccount implements IAccount {
 
   public getClient(): Client {
     return this._client
+  }
+
+  public async speedUpTransaction(transaction: string | Transaction, newFee: number): Promise<Transaction> {
+    return await this._client.chain.updateTransactionFee(transaction, newFee)
   }
 
   private createEthereumClient(asset?: string) {

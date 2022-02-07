@@ -15,8 +15,8 @@ class LiqualityRuleEngine implements IRuleEngine {
   private _swapProvider: LiqualitySwapProvider
   private _swap: Partial<SwapTransactionType>
   private _currentStep: number
-  private readonly _callback: (...args: unknown[]) => void
-  private readonly _totalSteps = 7
+  private readonly _callback: (payload: Partial<SwapTransactionType>) => void
+  private readonly _totalSteps = 4
 
   constructor(
     fromAccount: IAccount,
@@ -35,12 +35,15 @@ class LiqualityRuleEngine implements IRuleEngine {
         id: payload.id,
         to: payload.to,
         from: payload.from,
+        fromAddress: payload.fromAddress,
         toAddress: payload.toAddress,
         startTime: Date.parse(payload.createdAt),
         totalSteps: this._totalSteps,
         swapTransaction: payload,
         type: 'SWAP',
-        currentStep: this._currentStep
+        currentStep: this._currentStep,
+        status: payload.status,
+        endTime: payload.endTime
       })
     }
     this._ruleEngine = new Engine(this.getRules(toAccount, fromAccount, swapProvider))
@@ -51,6 +54,7 @@ class LiqualityRuleEngine implements IRuleEngine {
   }
 
   public async start(): Promise<void> {
+    console.log('Starting liquality swap rules engine')
     const fact = {
       EXPIRATION: true
     }
@@ -205,7 +209,6 @@ class LiqualityRuleEngine implements IRuleEngine {
               ...this._swap,
               ...confirmation
             }
-            this._currentStep++
             if (this._callback) this._callback(this._swap)
             almanac.addRuntimeFact('INITIATION_CONFIRMED', true)
           } else {
@@ -234,7 +237,6 @@ class LiqualityRuleEngine implements IRuleEngine {
           }
         }
 
-        this._currentStep++
         if (this._callback) this._callback(this._swap)
         almanac.addRuntimeFact('FUNDED', true)
       },
@@ -259,7 +261,6 @@ class LiqualityRuleEngine implements IRuleEngine {
           }
         }
 
-        this._currentStep++
         if (this._callback) this._callback(this._swap)
         almanac.addRuntimeFact('CONFIRM_COUNTER_PARTY_INITIATION', true)
       },

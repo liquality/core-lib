@@ -11,7 +11,7 @@ import {
 } from '../types'
 import { ChainId, chains, assets as cryptoassets } from '@liquality/cryptoassets'
 import { Client } from '@liquality/client'
-import { Address, BigNumber, bitcoin, FeeDetails } from '@liquality/types'
+import { Address, BigNumber, bitcoin, FeeDetails, Transaction } from '@liquality/types'
 import axios from 'axios'
 import { BitcoinEsploraBatchApiProvider } from '@liquality/bitcoin-esplora-batch-api-provider'
 import { BitcoinJsWalletProvider } from '@liquality/bitcoin-js-wallet-provider'
@@ -96,13 +96,24 @@ export default class BitcoinAccount implements IAccount {
   public async getUsedAddress(): Promise<Address> {
     if (this._address) return this._address
     const addresses = await this._client.wallet.getUsedAddresses(100)
-    if (addresses.length == 0) throw new Error('No addresses found')
-    this._address = addresses[0]
+    if (addresses.length == 0) {
+      const unusedAddress = await this.getUnusedAddress()
+      console.log('unused address: ', unusedAddress)
+      if (!unusedAddress) {
+        throw new Error('No Bitcoin addresses found')
+      } else {
+        this._address = unusedAddress
+      }
+    } else {
+      console.log('used address: ', addresses[0])
+      this._address = addresses[0]
+    }
     return this._address
   }
 
   public async getBalance(): Promise<BigNumber> {
     const addresses = await this._client.wallet.getUsedAddresses(100)
+    if (!addresses) return new BigNumber(0)
     return await this._client.chain.getBalance(addresses)
   }
 
@@ -141,8 +152,22 @@ export default class BitcoinAccount implements IAccount {
     return this._client
   }
 
+  public async speedUpTransaction(transaction: string | Transaction, newFee: number): Promise<Transaction> {
+    return await this._client.chain.updateTransactionFee(transaction, newFee)
+  }
+
   private async toAccount(): Promise<AccountType> {
-    return {
+    const balance = await this.getBalance().catch((error) => {
+      console.log(`BTC balance error: ${error}`)
+    })
+    const fiatRates = await this.fetchPricesForAssets('usd').catch((error) => {
+      console.log(`BTC fiat rates error: ${error}`)
+    })
+    const feeDetails = await this.getFeeDetails().catch((error) => {
+      console.log(`fee details error: ${error}`)
+    })
+
+    const account: AccountType = {
       name: `${chains[this._chain]?.name} 1`,
       chain: this._chain,
       type: 'default',
@@ -150,14 +175,17 @@ export default class BitcoinAccount implements IAccount {
       assets: [],
       addresses: [this._address.address],
       balances: {
-        [ASSET]: (await this.getBalance()).toNumber()
+        [ASSET]: (balance || new BigNumber(0)).toNumber()
       },
-      fiatRates: await this.fetchPricesForAssets('usd'),
-      feeDetails: await this.getFeeDetails(),
       color: '#FFF',
       createdAt: this._at,
       updatedAt: this._at
     }
+
+    if (fiatRates) account.fiatRates = fiatRates
+    if (feeDetails) account.feeDetails = feeDetails
+
+    return account
   }
 
   private createBtcClient() {
