@@ -37,7 +37,10 @@ export enum SwapProvidersEnum {
   LIQUALITY = 'LIQUALITY',
   LIQUALITYBOOST = 'LIQUALITYBOOST',
   SOVRYN = 'SOVRYN',
-  THORCHAIN = 'THORCHAIN'
+  THORCHAIN = 'THORCHAIN',
+  UNISWAPV2 = 'UNISWAPV2',
+  ONEINCHV3 = 'ONEINCHV3',
+  FASTBTC = 'FASTBTC'
 }
 
 export enum NetworkEnum {
@@ -85,10 +88,11 @@ export interface IConfig {
   getEthereumMainnet(): string
   getBitcoinMainnet(): string
   getBitcoinTestnet(): string
+  getEthereumScraperApi(network: NetworkEnum): string
   getBatchEsploraAPIUrl(network: NetworkEnum): string
   getChainNetwork(chain: ChainId, network: NetworkEnum): BitcoinNetwork & EthereumNetwork
   getDefaultEnabledChains(network: NetworkEnum): ChainId[]
-  getDefaultEnabledAssets(network: NetworkEnum): string[]
+  getDefaultEnabledAssets(network: NetworkEnum, walletId?: string): string[]
   getPriceFetcherUrl(): string
   getDefaultNetwork(): NetworkEnum
   getChainColor(chain: ChainId): string
@@ -201,6 +205,12 @@ export interface IWallet<T> {
    * Checks if the current wallet is newly installed
    */
   isNewInstallation(): Promise<boolean>
+
+  /**
+   * Updates the config object used by the wallet
+   * @param newConfig
+   */
+  updateConfig(newConfig: IConfig): IWallet<T>
 }
 
 export interface IAccountConstructor {
@@ -468,6 +478,7 @@ export interface SwapTransactionType extends MergedQuoteType {
   expireAt: number
   fee: number
   status: string
+  statusMessage: string
   secret: string
   secretHash: string
   slippage: number
@@ -553,7 +564,7 @@ export interface StateType {
       }
     >
   >
-  history?: HistoryItem[]
+  history?: Record<NetworkEnum, Record<string, HistoryItem[]>>
   marketData?: MarketDataType[]
   activeNetwork?: NetworkEnum
   activeWalletId?: string

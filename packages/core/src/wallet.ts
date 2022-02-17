@@ -29,8 +29,8 @@ export default class Wallet implements IWallet<StateType> {
   private _encryption: IEncryption
   private _callback: (account: AccountType) => void
   private readonly _callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>
-  private readonly _config: IConfig
   private readonly _accounts: AccountMapping
+  private _config: IConfig
   private _mnemonic: Mnemonic
   private _password: string
   private _activeNetwork: NetworkEnum
@@ -97,7 +97,14 @@ export default class Wallet implements IWallet<StateType> {
           [walletId]: this._config.getDefaultEnabledAssets(NetworkEnum.Mainnet)
         }
       },
-      history: []
+      history: {
+        [NetworkEnum.Testnet]: {
+          [walletId]: []
+        },
+        [NetworkEnum.Mainnet]: {
+          [walletId]: []
+        }
+      }
     }
 
     walletState.encryptedWallets = await this._encryption.encrypt(
@@ -145,7 +152,7 @@ export default class Wallet implements IWallet<StateType> {
     if (password) {
       const decryptedWallets = await this._encryption.decrypt(encryptedWallets, keySalt, password)
       if (!decryptedWallets) {
-        throw new Error('Password Invalid-> ' + decryptedWallets + ' - ' + keySalt + ' - ' + password)
+        throw new Error('Password Invalid')
       }
 
       const wallets = JSON.parse(decryptedWallets)
@@ -250,6 +257,11 @@ export default class Wallet implements IWallet<StateType> {
 
   public async isNewInstallation(): Promise<boolean> {
     return !(await this._storage.read())
+  }
+
+  public updateConfig(newConfig: IConfig): IWallet<StateType> {
+    this._config = newConfig
+    return this
   }
 
   public static generateSeedWords() {

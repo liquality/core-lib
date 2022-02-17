@@ -1,27 +1,44 @@
 import { IAccount, SwapTransactionType } from '../types'
 
 interface IAtomicSwapProvider {
-  updateOrder(order: Partial<SwapTransactionType>)
+  updateOrder(order: Partial<SwapTransactionType>): Promise<unknown>
 
-  findCounterPartyInitiation(toAccount: IAccount, swap: Partial<SwapTransactionType>)
+  findCounterPartyInitiation(
+    fromAccount: IAccount,
+    toAccount: IAccount,
+    swap: Partial<SwapTransactionType>
+  ): Promise<Partial<SwapTransactionType>>
 
-  confirmInitiation(fromAccount: IAccount, toAccount: IAccount, swap: Partial<SwapTransactionType>)
+  confirmInitiation(
+    fromAccount: IAccount,
+    toAccount: IAccount,
+    swap: Partial<SwapTransactionType>
+  ): Promise<Partial<SwapTransactionType>>
 
-  confirmCounterPartyInitiation(toAccount: IAccount, swap: Partial<SwapTransactionType>)
+  confirmCounterPartyInitiation(
+    fromAccount: IAccount,
+    toAccount: IAccount,
+    swap: Partial<SwapTransactionType>
+  ): Promise<Partial<SwapTransactionType>>
 
-  fundSwap(fromAccount: IAccount, swap: Partial<SwapTransactionType>)
+  fundSwap(fromAccount: IAccount, swap: Partial<SwapTransactionType>): Promise<Partial<SwapTransactionType>>
 
-  claimSwap(toAccount: IAccount, swap)
+  claimSwap(fromAccount: IAccount, toAccount: IAccount, swap): Promise<Partial<SwapTransactionType>>
 
-  waitForClaimConfirmations(toAccount: IAccount, swap: Partial<SwapTransactionType>)
+  waitForClaimConfirmations(
+    fromAccount: IAccount,
+    toAccount: IAccount,
+    swap: Partial<SwapTransactionType>
+  ): Promise<Partial<SwapTransactionType>>
 
-  hasSwapExpired(fromAccount: IAccount, swap: Partial<SwapTransactionType>): Promise<boolean>
-
-  waitForRefund(fromAccount: IAccount, swap: Partial<SwapTransactionType>): Promise<boolean>
+  waitForRefund(fromAccount: IAccount, swap: Partial<SwapTransactionType>): Promise<Partial<SwapTransactionType>>
 
   refundSwap(account: IAccount, swap: SwapTransactionType): Promise<Partial<SwapTransactionType>>
 
-  waitForRefundConfirmations(fromAccount: IAccount, swap: Partial<SwapTransactionType>)
+  waitForRefundConfirmations(
+    fromAccount: IAccount,
+    swap: Partial<SwapTransactionType>
+  ): Promise<Partial<SwapTransactionType>>
 }
 
 export default IAtomicSwapProvider

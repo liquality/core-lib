@@ -33,7 +33,6 @@ export default class BitcoinAccount implements IAccount {
   private _derivationPath: string
   private _address: Address
   private _assets: IAsset[]
-  private _balance: BigNumber
   private _config: IConfig
   private _at: number
   private _callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>
@@ -98,14 +97,13 @@ export default class BitcoinAccount implements IAccount {
     const addresses = await this._client.wallet.getUsedAddresses(100)
     if (addresses.length == 0) {
       const unusedAddress = await this.getUnusedAddress()
-      console.log('unused address: ', unusedAddress)
+
       if (!unusedAddress) {
         throw new Error('No Bitcoin addresses found')
       } else {
         this._address = unusedAddress
       }
     } else {
-      console.log('used address: ', addresses[0])
       this._address = addresses[0]
     }
     return this._address
@@ -164,7 +162,7 @@ export default class BitcoinAccount implements IAccount {
       console.log(`BTC fiat rates error: ${error}`)
     })
     const feeDetails = await this.getFeeDetails().catch((error) => {
-      console.log(`fee details error: ${error}`)
+      console.log(`BTC fee details error: ${error}`)
     })
 
     const account: AccountType = {

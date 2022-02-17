@@ -22,6 +22,7 @@ import {
 import { isERC20 } from '../utils'
 import { BigNumber, SendOptions } from '@liquality/types'
 import { Mutex } from 'async-mutex'
+import SovrynRuleEngine from '../rule-engine/sovryn-rule-engine'
 
 // use WRBTC address for RBTC native token
 const wrappedRbtcAddress = {
@@ -121,15 +122,15 @@ class SovrynSwapProvider extends SwapProvider {
     if (!this._mutex.isLocked()) {
       console.log(fromAccount, toAccount, swapTransaction)
       //Makes sure we can only run one instance of the rule engine at any given time for a given swap provider
-      // this._mutex.runExclusive(() => {
-      //   new LiqualityRuleEngine(
-      //     fromAccount,
-      //     toAccount,
-      //     this,
-      //     swapTransaction,
-      //     this._callbacks['onTransactionUpdate']
-      //   ).start()
-      // })
+      this._mutex.runExclusive(() => {
+        new SovrynRuleEngine(
+          fromAccount,
+          toAccount,
+          this,
+          swapTransaction,
+          this._callbacks['onTransactionUpdate']
+        ).start()
+      })
     } else {
       throw new Error('Rules Engine already running for this provider')
     }

@@ -54,22 +54,27 @@ class SendRuleEngine implements IRuleEngine {
       async () => {
         await withInterval(async () => {
           console.log('checking confirmations')
-          const response = await this._client.chain.getTransactionByHash(this._transaction.hash)
+          try {
+            const response = await this._client.chain.getTransactionByHash(this._transaction.hash)
 
-          if (response) {
-            console.log('confirmations: ', response.confirmations)
-            const confirmations = response.confirmations || 0
-            let status = 'INITIATED'
+            if (response) {
+              console.log('confirmations: ', response.confirmations)
+              const confirmations = response.confirmations || 0
+              let status = 'INITIATED'
 
-            if (confirmations >= chains[cryptoassets[this._asset].chain].safeConfirmations) {
-              status = 'SUCCESS'
-              this._currentStep++
+              if (confirmations >= chains[cryptoassets[this._asset].chain].safeConfirmations) {
+                status = 'SUCCESS'
+                this._currentStep++
+              }
+              if (this._callback) {
+                this._callback(response, status)
+              }
+
+              return status === 'SUCCESS'
             }
-            if (this._callback) {
-              this._callback(response, status)
-            }
-
-            return status === 'SUCCESS'
+          } catch (e) {
+            if (e.name === 'TxNotFoundError') console.warn(e)
+            else throw e
           }
         })
       },

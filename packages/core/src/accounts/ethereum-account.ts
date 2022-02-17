@@ -17,20 +17,19 @@ import { EthereumSwapProvider } from '@liquality/ethereum-swap-provider'
 import { EthereumScraperSwapFindProvider } from '@liquality/ethereum-scraper-swap-find-provider'
 
 export default class EthereumAccount implements IAccount {
-  private _mnemonic: Mnemonic
-  private _index: number
+  private readonly _mnemonic: Mnemonic
+  private readonly _index: number
   private _name: string
-  private _chain: ChainId
-  private _network: NetworkEnum
+  private readonly _chain: ChainId
+  private readonly _network: NetworkEnum
   private _hardware: Hardware
-  private _client: Client
-  private _derivationPath: string
+  private readonly _client: Client
+  private readonly _derivationPath: string
   private _address: Address
   private _assets: IAsset[]
-  private _balance: BigNumber
   private _config: IConfig
-  private _at: number
-  private _callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>
+  private readonly _at: number
+  private readonly _callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>
 
   constructor(
     config: IConfig,
@@ -50,9 +49,7 @@ export default class EthereumAccount implements IAccount {
     const ethereumNetwork = config.getChainNetwork(chain, network)
     const infuraApi = isTestnet ? config.getEthereumTestnet() : config.getEthereumMainnet()
     const feeProvider = isTestnet ? new EthereumRpcFeeProvider() : new EthereumGasNowFeeProvider()
-    const scraperApi = isTestnet
-      ? 'https://liquality.io/arbitrum-testnet-api'
-      : 'https://liquality.io/arbitrum-mainnet-api'
+    const scraperApi = config.getEthereumScraperApi(network)
 
     this._config = config
     this._mnemonic = mnemonic
@@ -82,8 +79,12 @@ export default class EthereumAccount implements IAccount {
 
     await this.getUsedAddress()
     await this.getAssets()
-    const fiatRates = await this.fetchPricesForAssets('usd')
-    const feeDetails = await this.getFeeDetails()
+    const fiatRates = await this.fetchPricesForAssets('usd').catch((error) => {
+      console.log(`ETH fiat rates error: ${error}`)
+    })
+    const feeDetails = await this.getFeeDetails().catch((error) => {
+      console.log(`Ethereum fee details error: ${error}`)
+    })
 
     for (const asset of this._assets) {
       assets.push(asset.getSymbol())
@@ -91,7 +92,7 @@ export default class EthereumAccount implements IAccount {
       balances[asset.getSymbol()] = (await asset.getBalance()).toNumber()
     }
 
-    return {
+    const account: AccountType = {
       name: `${chains[this._chain]?.name} 1`,
       chain: this._chain,
       type: 'default',
@@ -99,12 +100,15 @@ export default class EthereumAccount implements IAccount {
       assets,
       addresses,
       balances,
-      fiatRates,
-      feeDetails,
       color: '#FFF',
       createdAt: this._at,
       updatedAt: this._at
     }
+
+    if (fiatRates) account.fiatRates = fiatRates
+    if (feeDetails) account.feeDetails = feeDetails
+
+    return account
   }
 
   public async getAssets(): Promise<IAsset[]> {
@@ -113,9 +117,7 @@ export default class EthereumAccount implements IAccount {
     const ethereumNetwork = this._config.getChainNetwork(this._chain, this._network)
     const infuraApi = isTestnet ? this._config.getEthereumTestnet() : this._config.getEthereumMainnet()
     const feeProvider = isTestnet ? new EthereumRpcFeeProvider() : new EthereumGasNowFeeProvider()
-    const scraperApi = isTestnet
-      ? 'https://liquality.io/arbitrum-testnet-api'
-      : 'https://liquality.io/arbitrum-mainnet-api'
+    const scraperApi = this._config.getEthereumScraperApi(this._network)
 
     const _assetSymbols = this._config.getDefaultEnabledAssets(this._network)
     this._assets = _assetSymbols
@@ -152,8 +154,17 @@ export default class EthereumAccount implements IAccount {
   public async getUsedAddress(): Promise<Address> {
     if (this._address) return this._address
     const addresses = await this._client.wallet.getUsedAddresses(100)
-    if (addresses.length == 0) throw new Error('No addresses found')
-    this._address = addresses[0]
+    if (addresses.length == 0) {
+      const unusedAddress = await this.getUnusedAddress()
+
+      if (!unusedAddress) {
+        throw new Error('No Ethereum addresses found')
+      } else {
+        this._address = unusedAddress
+      }
+    } else {
+      this._address = addresses[0]
+    }
     return this._address
   }
 
@@ -235,6 +246,7 @@ export default class EthereumAccount implements IAccount {
   ) {
     const ethClient = new Client()
     ethClient.addProvider(new EthereumRpcProvider({ uri: rpcApi }))
+    ethClient.addProvider(feeProvider)
 
     ethClient.addProvider(
       new EthereumJsWalletProvider({
@@ -254,7 +266,6 @@ export default class EthereumAccount implements IAccount {
       if (scraperApi) ethClient.addProvider(new EthereumScraperSwapFindProvider(scraperApi))
     }
 
-    ethClient.addProvider(feeProvider)
     return ethClient
   }
 }

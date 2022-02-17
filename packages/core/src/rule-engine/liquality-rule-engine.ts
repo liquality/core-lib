@@ -46,7 +46,7 @@ class LiqualityRuleEngine implements IRuleEngine {
         endTime: payload.endTime
       })
     }
-    this._ruleEngine = new Engine(this.getRules(toAccount, fromAccount, swapProvider))
+    this._ruleEngine = new Engine()
   }
 
   public getTotalSteps(): number {
@@ -54,24 +54,38 @@ class LiqualityRuleEngine implements IRuleEngine {
   }
 
   public async start(): Promise<void> {
-    console.log('Starting liquality swap rules engine')
-    const fact = {
-      EXPIRATION: true
+    console.log('Starting liquality swap rules engine:', this._swap)
+
+    const canRefund = await this._swapProvider.waitForRefund(this._fromAccount, this._swap)
+    console.log('canRefund: ', canRefund)
+    if (canRefund) {
+      for (const rule of this.getRefundRules(this._toAccount, this._fromAccount, this._swapProvider)) {
+        this._ruleEngine.addRule(rule)
+      }
+      this._ruleEngine.addFact('WAITING_FOR_REFUND', true)
+    } else {
+      for (const rule of this.getSwapRules(this._toAccount, this._fromAccount, this._swapProvider)) {
+        this._ruleEngine.addRule(rule)
+      }
+      this._ruleEngine.addFact('INITIATED', true)
     }
 
-    await this._ruleEngine.run(fact)
+    const response = await this._ruleEngine.run().catch((error) => {
+      console.log('Failed to run engine: ', error)
+    })
+    console.log('response: ', response)
   }
 
   /**
    * Helper method to build a rule
-   * @param status
+   * @param factId
    * @param priority
    * @param onSuccess
    * @param onFailure
    * @private
    */
   private static buildRule(
-    status: string,
+    factId: string,
     priority: number,
     onSuccess: (event, almanac) => void,
     onFailure: (event, almanac) => void
@@ -80,16 +94,16 @@ class LiqualityRuleEngine implements IRuleEngine {
       conditions: {
         any: [
           {
-            fact: status,
+            fact: factId,
             operator: 'equal',
             value: true
           }
         ]
       },
       event: {
-        type: status,
+        type: factId,
         params: {
-          message: `${status} triggered`
+          message: `${factId} triggered`
         }
       },
       priority,
@@ -104,41 +118,35 @@ class LiqualityRuleEngine implements IRuleEngine {
    * @param fromAccount
    * @param swapProvider
    */
-  private getRules = (
+  private getRefundRules = (
     toAccount: IAccount,
     fromAccount: IAccount,
     swapProvider: LiqualitySwapProvider
   ): RuleProperties[] => {
-    const expirationRule: RuleProperties = LiqualityRuleEngine.buildRule(
-      'EXPIRATION',
-      11,
-      async (event, almanac) => {
-        const hasSwapExpired = await swapProvider.hasSwapExpired(fromAccount, this._swap)
-        if (this._callback && hasSwapExpired)
-          this._callback({
-            status: 'EXPIRED'
-          })
-        almanac.addRuntimeFact('WAITING_FOR_REFUND', hasSwapExpired)
-        almanac.addRuntimeFact('INITIATED', !hasSwapExpired)
-      },
-      () => {
-        throw new Error('Rule trigger invalid')
-      }
-    )
-
     const waitingForRefundRule: RuleProperties = LiqualityRuleEngine.buildRule(
       'WAITING_FOR_REFUND',
       10,
       async (event, almanac) => {
-        await swapProvider.waitForRefund(fromAccount, this._swap)
-        if (this._callback)
-          this._callback({
+        console.log('WAITING_FOR_REFUND')
+        const updates = await swapProvider.waitForRefund(fromAccount, this._swap)
+
+        console.log('updates:', updates)
+        if (updates) {
+          console.log('updates1:', updates)
+          this._swap = {
             ...this._swap,
-            status: 'GET_REFUND'
-          })
-        almanac.addRuntimeFact('GET_REFUND', true)
+            status: updates.status,
+            statusMessage: 'Waiting for a refund'
+          }
+          if (this._callback) this._callback(this._swap)
+          almanac.addRuntimeFact('GET_REFUND', true)
+        } else {
+          console.log('updates2:', updates)
+          almanac.addRuntimeFact('INITIATION', true)
+        }
       },
       (event, almanac) => {
+        console.log('updates3:')
         almanac.addRuntimeFact('GET_REFUND', false)
       }
     )
@@ -147,13 +155,18 @@ class LiqualityRuleEngine implements IRuleEngine {
       'GET_REFUND',
       9,
       async (event, almanac) => {
-        const { refundHash, status } = await swapProvider.refundSwap(fromAccount, this._swap)
-        this._swap = {
-          ...this._swap,
-          refundHash,
-          status
+        console.log('GET_REFUND')
+        if (!this._swap.refundHash) {
+          const { refundHash, status } = await swapProvider.refundSwap(fromAccount, this._swap)
+          this._swap = {
+            ...this._swap,
+            refundHash,
+            status,
+            statusMessage: 'Getting a refund'
+          }
+          if (this._callback) this._callback(this._swap)
         }
-        if (this._callback) this._callback(this._swap)
+
         almanac.addRuntimeFact('WAITING_FOR_REFUND_CONFIRMATIONS', true)
       },
       (event, almanac) => {
@@ -165,6 +178,7 @@ class LiqualityRuleEngine implements IRuleEngine {
       'WAITING_FOR_REFUND_CONFIRMATIONS',
       8,
       async () => {
+        console.log('WAITING_FOR_REFUND_CONFIRMATIONS')
         const confirmation = await withInterval(async () =>
           swapProvider.waitForRefundConfirmations(fromAccount, this._swap)
         )
@@ -173,22 +187,34 @@ class LiqualityRuleEngine implements IRuleEngine {
           ...confirmation
         }
         if (this._callback) this._callback(this._swap)
+        // Stop evaluating rules
+        this._ruleEngine.stop()
       },
       () => {
         // Dispatch that the this._swap refund has failed
       }
     )
 
+    return [waitingForRefundRule, getRefundRule, refundConfirmationRule]
+  }
+
+  private getSwapRules = (
+    toAccount: IAccount,
+    fromAccount: IAccount,
+    swapProvider: LiqualitySwapProvider
+  ): RuleProperties[] => {
     const initiatedRule: RuleProperties = LiqualityRuleEngine.buildRule(
       'INITIATED',
       7,
       async (event, almanac) => {
-        await swapProvider.updateOrder(this._swap)
-        if (this._callback)
-          this._callback({
-            ...this._swap,
-            status: 'INITIATION_REPORTED'
-          })
+        console.log('INITIATED')
+        await swapProvider.updateOrder(this._swap).catch((error) => console.log(error))
+        this._swap = {
+          ...this._swap,
+          status: 'INITIATION_REPORTED',
+          statusMessage: 'Starting swap'
+        }
+        if (this._callback) this._callback(this._swap)
         almanac.addRuntimeFact('INITIATION_REPORTED', true)
       },
       function (event, almanac) {
@@ -200,6 +226,7 @@ class LiqualityRuleEngine implements IRuleEngine {
       'INITIATION_REPORTED',
       6,
       async (event, almanac) => {
+        console.log('INITIATION_REPORTED')
         if (!this._swap.toFundHash) {
           const confirmation = await withInterval(async () =>
             swapProvider.confirmInitiation(fromAccount, toAccount, this._swap)
@@ -228,12 +255,14 @@ class LiqualityRuleEngine implements IRuleEngine {
       'INITIATION_CONFIRMED',
       5,
       async (event, almanac) => {
+        console.log('INITIATION_CONFIRMED')
         if (!this._swap.fundTxHash) {
           const { fundTxHash, status } = await swapProvider.fundSwap(fromAccount, this._swap)
           this._swap = {
             ...this._swap,
             fundTxHash,
-            status
+            status,
+            statusMessage: `Locked ${this._swap.from}`
           }
         }
 
@@ -250,21 +279,28 @@ class LiqualityRuleEngine implements IRuleEngine {
       'FUNDED',
       4,
       async (event, almanac) => {
+        console.log('FUNDED')
         if (!this._swap.toFundHash) {
           const { toFundHash, status } = await withInterval(async () =>
-            swapProvider.findCounterPartyInitiation(toAccount, this._swap)
+            swapProvider.findCounterPartyInitiation(fromAccount, toAccount, this._swap)
           )
           this._swap = {
             ...this._swap,
             toFundHash,
-            status
+            status,
+            statusMessage: `Locking ${this._swap.to}`
           }
-        }
 
-        if (this._callback) this._callback(this._swap)
-        almanac.addRuntimeFact('CONFIRM_COUNTER_PARTY_INITIATION', true)
+          console.log('FUNDED: ', this._swap)
+
+          if (this._callback) this._callback(this._swap)
+          almanac.addRuntimeFact(status, true)
+        } else {
+          almanac.addRuntimeFact('CONFIRM_COUNTER_PARTY_INITIATION', true)
+        }
       },
       (event, almanac) => {
+        console.log('failed to process step: ')
         almanac.addRuntimeFact('CONFIRM_COUNTER_PARTY_INITIATION', false)
       }
     )
@@ -273,22 +309,24 @@ class LiqualityRuleEngine implements IRuleEngine {
       'CONFIRM_COUNTER_PARTY_INITIATION',
       3,
       async (event, almanac) => {
+        console.log('CONFIRM_COUNTER_PARTY_INITIATION')
         if (!this._swap.toFundHash) {
           const { toFundHash, status } = await withInterval(async () =>
-            swapProvider.findCounterPartyInitiation(toAccount, this._swap)
+            swapProvider.confirmCounterPartyInitiation(fromAccount, toAccount, this._swap)
           )
           this._swap = {
             ...this._swap,
             toFundHash,
-            status
+            status,
+            statusMessage: `Locked ${this._swap.to}`
           }
+          this._currentStep++
+          if (this._callback) this._callback(this._swap)
         }
-
-        this._currentStep++
-        if (this._callback) this._callback(this._swap)
         almanac.addRuntimeFact('READY_TO_CLAIM', true)
       },
       (event, almanac) => {
+        console.log('READY_TO_CLAIM: failed to process step: ')
         almanac.addRuntimeFact('READY_TO_CLAIM', false)
       }
     )
@@ -297,13 +335,15 @@ class LiqualityRuleEngine implements IRuleEngine {
       'READY_TO_CLAIM',
       2,
       async (event, almanac) => {
+        console.log('READY_TO_CLAIM')
         if (!this._swap.toClaimHash) {
-          const { toClaimHash, toClaimTx, status } = await swapProvider.claimSwap(toAccount, this._swap)
+          const { toClaimHash, toClaimTx, status } = await swapProvider.claimSwap(fromAccount, toAccount, this._swap)
           this._swap = {
             ...this._swap,
             toClaimHash,
             toClaimTx,
-            status
+            status,
+            statusMessage: `Claiming ${this._swap.to}`
           }
         }
 
@@ -319,21 +359,23 @@ class LiqualityRuleEngine implements IRuleEngine {
     const claimConfirmationRule: RuleProperties = LiqualityRuleEngine.buildRule(
       'WAITING_FOR_CLAIM_CONFIRMATIONS',
       1,
-      async (event, almanac) => {
+      async () => {
+        console.log('WAITING_FOR_CLAIM_CONFIRMATIONS')
         if (!this._swap.endTime) {
           const { endTime, status } = await withInterval(async () =>
-            swapProvider.waitForClaimConfirmations(toAccount, this._swap)
+            swapProvider.waitForClaimConfirmations(fromAccount, toAccount, this._swap)
           )
           this._swap = {
             ...this._swap,
             endTime,
             status
           }
+          this._currentStep++
+          if (this._callback) this._callback(this._swap)
         }
 
-        this._currentStep++
-        if (this._callback) this._callback(this._swap)
-        almanac.addRuntimeFact('SUCCESS', true)
+        // Stop evaluating rules
+        this._ruleEngine.stop()
       },
       (event, almanac) => {
         almanac.addRuntimeFact('SUCCESS', false)
@@ -341,10 +383,6 @@ class LiqualityRuleEngine implements IRuleEngine {
     )
 
     return [
-      expirationRule,
-      waitingForRefundRule,
-      getRefundRule,
-      refundConfirmationRule,
       initiatedRule,
       initiationReportedRule,
       initiationConfirmedRule,

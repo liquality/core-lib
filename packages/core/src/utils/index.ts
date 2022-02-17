@@ -25,7 +25,7 @@ export const withInterval = async (func: () => unknown): Promise<Partial<SwapTra
   if (updates) {
     return updates
   }
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const interval = setInterval(async () => {
       try {
         const updates = await func()
@@ -34,8 +34,10 @@ export const withInterval = async (func: () => unknown): Promise<Partial<SwapTra
           resolve(updates)
         }
       } catch (e) {
-        reject(`Failed to run: ${func.name}`)
+        console.log(`withInterval: Failed to run function ${e}`)
       }
     }, 15000 * Math.random() + 15000)
   })
 }
+
+export const wait = (millis) => new Promise((resolve) => setTimeout(() => resolve(true), millis))

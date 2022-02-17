@@ -44,18 +44,18 @@ const DefaultAssets: Record<NetworkEnum, string[]> = {
   mainnet: [
     'BTC',
     'ETH',
-    'DAI',
-    'USDC',
-    'USDT',
-    'WBTC',
-    'UNI',
     'RBTC',
-    'SOV',
-    'BNB',
-    'NEAR',
-    'MATIC',
-    'PWETH',
-    'ARBETH'
+    'SOV'
+    // 'DAI',
+    // 'USDC',
+    // 'USDT',
+    // 'WBTC',
+    // 'UNI',
+    // 'BNB',
+    // 'NEAR',
+    // 'MATIC',
+    // 'PWETH',
+    // 'ARBETH'
   ],
   // testnet: ['BTC', 'ETH', 'DAI', 'RBTC', 'BNB', 'NEAR', 'SOV', 'MATIC', 'PWETH', 'ARBETH']
   testnet: ['BTC', 'ETH', 'RBTC', 'SOV']
@@ -65,11 +65,11 @@ const DefaultChains: Record<NetworkEnum, ChainId[]> = {
   [NetworkEnum.Mainnet]: [
     ChainId.Bitcoin,
     ChainId.Ethereum,
-    ChainId.Rootstock,
-    ChainId.BinanceSmartChain,
-    ChainId.Near,
-    ChainId.Polygon,
-    ChainId.Arbitrum
+    ChainId.Rootstock
+    // ChainId.BinanceSmartChain,
+    // ChainId.Near,
+    // ChainId.Polygon,
+    // ChainId.Arbitrum
   ],
   [NetworkEnum.Testnet]: [ChainId.Ethereum, ChainId.Bitcoin, ChainId.Rootstock]
 }
@@ -77,6 +77,11 @@ const DefaultChains: Record<NetworkEnum, ChainId[]> = {
 const exploraApis: Record<NetworkEnum, string> = {
   [NetworkEnum.Testnet]: 'https://liquality.io/testnet/electrs',
   [NetworkEnum.Mainnet]: 'https://api-mainnet-bitcoin-electrs.liquality.io'
+}
+
+const ethereumScraperApis: Record<NetworkEnum, string> = {
+  [NetworkEnum.Testnet]: 'https://eth-ropsten-api.liq-chainhub.net/',
+  [NetworkEnum.Mainnet]: 'https://eth-mainnet-api.liq-chainhub.net/'
 }
 
 const batchEsploraApis: Record<NetworkEnum, string> = {
@@ -153,6 +158,10 @@ export class Config implements IConfig {
 
   public getBitcoinTestnet(): string {
     return exploraApis[NetworkEnum.Testnet]
+  }
+
+  public getEthereumScraperApi(network: NetworkEnum): string {
+    return ethereumScraperApis[network]
   }
 
   public getBatchEsploraAPIUrl(network: NetworkEnum): string {
