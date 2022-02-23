@@ -1,8 +1,8 @@
-import { AccountType, Hardware, IAccount, IAsset, IConfig, Mnemonic, StateType } from '../types'
+import { AccountType, Hardware, IAccount, IAsset, IConfig, Mnemonic, StateType, TriggerType } from '../types'
 import { ChainId, assets as cryptoassets, chains, isEthereumChain } from '@liquality/cryptoassets'
 import { NetworkEnum } from '../types'
 import { Client } from '@liquality/client'
-import { Address, BigNumber, FeeDetails } from '@liquality/types'
+import { Address, BigNumber, FeeDetails, Transaction } from '@liquality/types'
 import { EthereumRpcFeeProvider } from '@liquality/ethereum-rpc-fee-provider'
 import { EthereumGasNowFeeProvider } from '@liquality/ethereum-gas-now-fee-provider'
 import { EthereumNetwork } from '@liquality/ethereum-networks'
@@ -11,21 +11,25 @@ import { EthereumJsWalletProvider } from '@liquality/ethereum-js-wallet-provider
 import Asset from '../asset'
 import { EthereumErc20Provider } from '@liquality/ethereum-erc20-provider'
 import axios from 'axios'
+import { EthereumErc20SwapProvider } from '@liquality/ethereum-erc20-swap-provider'
+import { EthereumErc20ScraperSwapFindProvider } from '@liquality/ethereum-erc20-scraper-swap-find-provider'
+import { EthereumSwapProvider } from '@liquality/ethereum-swap-provider'
+import { EthereumScraperSwapFindProvider } from '@liquality/ethereum-scraper-swap-find-provider'
 
 export default class EthereumAccount implements IAccount {
-  private _mnemonic: Mnemonic
-  private _index: number
+  private readonly _mnemonic: Mnemonic
+  private readonly _index: number
   private _name: string
-  private _chain: ChainId
-  private _network: NetworkEnum
+  private readonly _chain: ChainId
+  private readonly _network: NetworkEnum
   private _hardware: Hardware
-  private _client: Client
-  private _derivationPath: string
+  private readonly _client: Client
+  private readonly _derivationPath: string
   private _address: Address
   private _assets: IAsset[]
-  private _balance: BigNumber
   private _config: IConfig
-  private _at: number
+  private readonly _at: number
+  private readonly _callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>
 
   constructor(
     config: IConfig,
@@ -34,6 +38,7 @@ export default class EthereumAccount implements IAccount {
     chain: ChainId,
     network: NetworkEnum,
     assetSymbols: string[],
+    callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>,
     hardware?: Hardware
   ) {
     if (!mnemonic) {
@@ -44,6 +49,7 @@ export default class EthereumAccount implements IAccount {
     const ethereumNetwork = config.getChainNetwork(chain, network)
     const infuraApi = isTestnet ? config.getEthereumTestnet() : config.getEthereumMainnet()
     const feeProvider = isTestnet ? new EthereumRpcFeeProvider() : new EthereumGasNowFeeProvider()
+    const scraperApi = config.getEthereumScraperApi(network)
 
     this._config = config
     this._mnemonic = mnemonic
@@ -55,9 +61,11 @@ export default class EthereumAccount implements IAccount {
     this._at = Date.now()
     this._assets = []
     this._derivationPath = this.calculateDerivationPath()
-    this._client = this.createEthereumClient(
+    this._callbacks = callbacks
+    this._client = EthereumAccount.createEthereumClient(
       ethereumNetwork as EthereumNetwork,
       infuraApi,
+      scraperApi,
       feeProvider,
       this._mnemonic,
       this._derivationPath
@@ -70,9 +78,13 @@ export default class EthereumAccount implements IAccount {
     const balances: Record<string, number> = {}
 
     await this.getUsedAddress()
-    await this.getAssets()
-    const fiatRates = await this.fetchPricesForAssets('usd')
-    const feeDetails = await this.getFeeDetails()
+    await this.buildAssets()
+    const fiatRates = await this.fetchPricesForAssets('usd').catch((error) => {
+      console.log(`ETH fiat rates error: ${error}`)
+    })
+    const feeDetails = await this.getFeeDetails().catch((error) => {
+      console.log(`Ethereum fee details error: ${error}`)
+    })
 
     for (const asset of this._assets) {
       assets.push(asset.getSymbol())
@@ -80,7 +92,7 @@ export default class EthereumAccount implements IAccount {
       balances[asset.getSymbol()] = (await asset.getBalance()).toNumber()
     }
 
-    return {
+    const account: AccountType = {
       name: `${chains[this._chain]?.name} 1`,
       chain: this._chain,
       type: 'default',
@@ -88,37 +100,18 @@ export default class EthereumAccount implements IAccount {
       assets,
       addresses,
       balances,
-      fiatRates,
-      feeDetails,
       color: '#FFF',
       createdAt: this._at,
       updatedAt: this._at
     }
+
+    if (fiatRates) account.fiatRates = fiatRates
+    if (feeDetails) account.feeDetails = feeDetails
+
+    return account
   }
 
-  public async getAssets(): Promise<IAsset[]> {
-    if (!this._address) this.getUsedAddress()
-    const isTestnet = this._network === NetworkEnum.Testnet
-    const ethereumNetwork = this._config.getChainNetwork(this._chain, this._network)
-    const infuraApi = isTestnet ? this._config.getEthereumTestnet() : this._config.getEthereumMainnet()
-    const feeProvider = isTestnet ? new EthereumRpcFeeProvider() : new EthereumGasNowFeeProvider()
-
-    const _assetSymbols = this._config.getDefaultEnabledAssets(this._network)
-    this._assets = _assetSymbols
-      .filter((asset) => {
-        return cryptoassets[asset]?.chain === this._chain
-      })
-      .map((asset) => {
-        const client = this.createEthereumClient(
-          ethereumNetwork as EthereumNetwork,
-          infuraApi,
-          feeProvider,
-          this._mnemonic,
-          this._derivationPath,
-          asset
-        )
-        return new Asset(asset, this._address.address, client)
-      })
+  public getAssets(): IAsset[] {
     return this._assets
   }
 
@@ -137,8 +130,17 @@ export default class EthereumAccount implements IAccount {
   public async getUsedAddress(): Promise<Address> {
     if (this._address) return this._address
     const addresses = await this._client.wallet.getUsedAddresses(100)
-    if (addresses.length == 0) throw new Error('No addresses found')
-    this._address = addresses[0]
+    if (addresses.length == 0) {
+      const unusedAddress = await this.getUnusedAddress()
+
+      if (!unusedAddress) {
+        throw new Error('No Ethereum addresses found')
+      } else {
+        this._address = unusedAddress
+      }
+    } else {
+      this._address = addresses[0]
+    }
     return this._address
   }
 
@@ -168,12 +170,10 @@ export default class EthereumAccount implements IAccount {
     const { data } = await axios.get(`${this._config.getPriceFetcherUrl()}/simple/price`, {
       params: { vs_currencies: toCurrency, ids: coindIds.join(',') }
     })
-    const prices = Object.keys(data).reduce((acc: Record<string, number>, coinGeckoId) => {
+    return Object.keys(data).reduce((acc: Record<string, number>, coinGeckoId) => {
       acc[reverseMap[coinGeckoId]] = data[coinGeckoId][toCurrency.toLowerCase()]
       return acc
     }, {})
-
-    return prices
   }
 
   public async refresh(): Promise<AccountType> {
@@ -203,9 +203,45 @@ export default class EthereumAccount implements IAccount {
     }
   }
 
-  private createEthereumClient(
+  public getClient(): Client {
+    return this._client
+  }
+
+  public async speedUpTransaction(transaction: string | Transaction, newFee: number): Promise<Transaction> {
+    return await this._client.chain.updateTransactionFee(transaction, newFee)
+  }
+
+  private async buildAssets(): Promise<IAsset[]> {
+    const _assetSymbols = this._config.getDefaultEnabledAssets(this._network)
+    const isTestnet = this._network === NetworkEnum.Testnet
+    const ethereumNetwork = this._config.getChainNetwork(this._chain, this._network)
+    const infuraApi = isTestnet ? this._config.getEthereumTestnet() : this._config.getEthereumMainnet()
+    const feeProvider = isTestnet ? new EthereumRpcFeeProvider() : new EthereumGasNowFeeProvider()
+    const scraperApi = this._config.getEthereumScraperApi(this._network)
+
+    this._assets = _assetSymbols
+      .filter((asset) => {
+        return cryptoassets[asset]?.chain === this._chain
+      })
+      .map((asset) => {
+        const client = EthereumAccount.createEthereumClient(
+          ethereumNetwork,
+          infuraApi,
+          scraperApi,
+          feeProvider,
+          this._mnemonic,
+          this._derivationPath,
+          asset
+        )
+        return new Asset(asset, this._address.address, client, this._callbacks)
+      })
+    return this._assets
+  }
+
+  private static createEthereumClient(
     ethereumNetwork: EthereumNetwork,
     rpcApi: string,
+    scraperApi: string,
     feeProvider: EthereumRpcFeeProvider | EthereumGasNowFeeProvider,
     mnemonic: string,
     derivationPath: string,
@@ -213,7 +249,7 @@ export default class EthereumAccount implements IAccount {
   ) {
     const ethClient = new Client()
     ethClient.addProvider(new EthereumRpcProvider({ uri: rpcApi }))
-
+    ethClient.addProvider(feeProvider)
     ethClient.addProvider(
       new EthereumJsWalletProvider({
         network: ethereumNetwork,
@@ -225,9 +261,13 @@ export default class EthereumAccount implements IAccount {
     if (asset && cryptoassets[asset]?.type === 'erc20') {
       const contractAddress = cryptoassets[asset].contractAddress
       ethClient.addProvider(new EthereumErc20Provider(contractAddress))
+      ethClient.addProvider(new EthereumErc20SwapProvider())
+      if (scraperApi) ethClient.addProvider(new EthereumErc20ScraperSwapFindProvider(scraperApi))
+    } else {
+      ethClient.addProvider(new EthereumSwapProvider())
+      if (scraperApi) ethClient.addProvider(new EthereumScraperSwapFindProvider(scraperApi))
     }
 
-    ethClient.addProvider(feeProvider)
     return ethClient
   }
 }

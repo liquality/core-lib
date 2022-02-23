@@ -1,7 +1,5 @@
 import BigNumber from 'bignumber.js'
-import { unitToCurrency, assets } from '@liquality/cryptoassets'
-// FIXME import
-import { Asset } from '@liquality/cryptoassets/dist/src/types'
+import { unitToCurrency, assets, Asset } from '@liquality/cryptoassets'
 
 export const VALUE_DECIMALS = 6
 

@@ -11,10 +11,37 @@
 
 import { ChainId } from '@liquality/cryptoassets'
 import { Address, BigNumber, FeeDetails, SendOptions, Transaction } from '@liquality/types'
+import { Client } from '@liquality/client'
 import { BitcoinNetwork } from '@liquality/bitcoin-networks'
 import { EthereumNetwork } from '@liquality/ethereum-networks'
+import SwapProvider from './swaps/swap-provider'
+
+export type SwapProviderIdType = 'liquality' | 'uniswapV2' | 'sovryn' | 'liqualityBoost'
+
+export type SwapProviderType = {
+  name: string
+  icon: string
+  type: SwapProvidersEnum
+  agent?: string
+  node?: string
+  network?: string
+  routerAddress?: string
+  routerAddressRBTC?: string
+  rpcURL?: string
+  supportedBridgeAssets?: string[]
+}
 
 export type Mnemonic = string
+
+export enum SwapProvidersEnum {
+  LIQUALITY = 'LIQUALITY',
+  LIQUALITYBOOST = 'LIQUALITYBOOST',
+  SOVRYN = 'SOVRYN',
+  THORCHAIN = 'THORCHAIN',
+  UNISWAPV2 = 'UNISWAPV2',
+  ONEINCHV3 = 'ONEINCHV3',
+  FASTBTC = 'FASTBTC'
+}
 
 export enum NetworkEnum {
   Mainnet = 'mainnet',
@@ -61,16 +88,22 @@ export interface IConfig {
   getEthereumMainnet(): string
   getBitcoinMainnet(): string
   getBitcoinTestnet(): string
+  getEthereumScraperApi(network: NetworkEnum): string
+  getRSKScraperApi(network: NetworkEnum): string
   getBatchEsploraAPIUrl(network: NetworkEnum): string
   getChainNetwork(chain: ChainId, network: NetworkEnum): BitcoinNetwork & EthereumNetwork
   getDefaultEnabledChains(network: NetworkEnum): ChainId[]
-  getDefaultEnabledAssets(network: NetworkEnum): string[]
+  getDefaultEnabledAssets(network: NetworkEnum, walletId?: string): string[]
   getPriceFetcherUrl(): string
   getDefaultNetwork(): NetworkEnum
   getChainColor(chain: ChainId): string
   getBitcoinFeeUrl(): string
   getTestnetContractAddress(assetSymbol: string): string
-  getSovereignRPCAPIUrl(network: NetworkEnum): string
+  getSovrynRPCAPIUrl(network: NetworkEnum): string
+  getSwapProvider(network: NetworkEnum, providerId: string): SwapProviderType
+  getSwapProviders(network: NetworkEnum): Partial<Record<SwapProvidersEnum, SwapProviderType>>
+  getAgentUrl(network: NetworkEnum, providerId: SwapProvidersEnum): string
+  getInfuraAPIKey(): string
 }
 
 export interface IWalletConstructor<T> {
@@ -89,7 +122,7 @@ export interface IWallet<T> {
   /**
    * Generates some values necessary to build the wallet state on the client
    */
-  init(password: string, mnemonic: string): InitialStateType
+  init(password: string, mnemonic: Mnemonic, imported: boolean): Promise<StateType>
 
   /**
    * One stop shop that shows how to build a functioning wallet
@@ -140,10 +173,23 @@ export interface IWallet<T> {
   getAccounts(): AccountMapping
 
   /**
+   * Returns the active/enabled swap providers
+   */
+  getSwapProviders(): Partial<Record<SwapProvidersEnum, SwapProvider>>
+
+  /**
    * Subscribes a callback that will be called whenever the accounts have been fetched/updated
+   * @param event The event that triggers the provided callback
    * @param callback
    */
   subscribe(callback: (account: AccountType) => void)
+
+  /**
+   * Subscribes a callback that will be called whenever the corresponding trigger has been fired off
+   * @param trigger
+   * @param callback
+   */
+  on(trigger: TriggerType, callback: (...args: unknown[]) => void)
 
   /**
    * Refresh balances, fees and fiat rates for the different accounts/assets
@@ -151,16 +197,21 @@ export interface IWallet<T> {
   refresh()
 
   /**
-   * Fetches the fiat prices/rates for the provided list of assets
-   * @param baseCurrencies
-   * @param toCurrency
+   * Return a swap provider if it exists, otherwise, create a new one and return it
+   * @param swapProviderType
    */
-  fetchPricesForAssets(baseCurrencies: Array<string>, toCurrency: string): Promise<StateType['fiatRates']>
+  getSwapProvider(swapProviderType: SwapProvidersEnum): SwapProvider
 
   /**
    * Checks if the current wallet is newly installed
    */
   isNewInstallation(): Promise<boolean>
+
+  /**
+   * Updates the config object used by the wallet
+   * @param newConfig
+   */
+  updateConfig(newConfig: IConfig): IWallet<T>
 }
 
 export interface IAccountConstructor {
@@ -183,7 +234,7 @@ export interface IAccount {
    * Fetches all the assets belonging to the associated account.
    * It only exposes the assets that are enabled in the Config object
    */
-  getAssets(): Promise<IAsset[]>
+  getAssets(): IAsset[]
 
   /**
    * Fetches an address that has not seen any transactions
@@ -219,7 +270,20 @@ export interface IAccount {
    * Fetches fiat rates for the assets associated with the current account
    */
   fetchPricesForAssets(toCurrency: string): Promise<StateType['fiatRates']>
+
+  /**
+   * Refreshes the account info
+   */
   refresh(): Promise<AccountType>
+
+  getClient(): Client
+
+  /**
+   * Speeds up an already submitted transaction
+   * @param transaction
+   * @param newFee
+   */
+  speedUpTransaction(transaction: string | Transaction, newFee: number): Promise<Transaction>
 }
 
 export interface IAsset {
@@ -239,11 +303,22 @@ export interface IAsset {
   getBalance(): Promise<BigNumber>
 
   /**
+   * Returns the client used by the current asset
+   */
+  getClient(): Client
+
+  /**
    * Performs a transaction
    * @param options the payload information necessary to perform the transaction
    * @returns return a transaction object
    */
-  transmit(options: SendOptions): Promise<Transaction>
+  transmit(options: SendOptions): Promise<HistoryItem>
+
+  /**
+   * Starts a rule engine that will keep track of the transactions until it is confirmed
+   * @param transaction
+   */
+  runRulesEngine(transaction: Transaction): void
 
   /**
    * Fetches past transactions
@@ -251,7 +326,81 @@ export interface IAsset {
   getPastTransactions(): Promise<Transaction[]>
 }
 
+export interface ISwapProvider {
+  getSupportedPairs(): Promise<MarketDataType[]>
+  getQuote(marketData: MarketDataType[], from: string, to: string, amount: BigNumber): QuoteType
+  performSwap(
+    fromAccount: IAccount,
+    toAccount: IAccount,
+    fromAsset: string,
+    quote: Partial<SwapPayloadType>
+  ): Promise<Partial<SwapTransactionType>>
+  estimateFees(
+    asset: string,
+    txType: string,
+    quote: QuoteType,
+    feePrices: number[],
+    max: number
+  ): Promise<Record<number, BigNumber>>
+}
+
+export interface IRuleEngine {
+  getTotalSteps(): number
+  start(): Promise<void>
+}
+
 //-----------------------------------DATA TYPES----------------------------
+export type LockedQuoteType = {
+  id: string
+  orderId: string
+  from: string
+  to: string
+  fromAmount: number
+  toAmount: number
+  rate: number
+  spread: number
+  minConf: number
+  expiresAt: number
+  hasAgentUnconfirmedTx: boolean
+  hasUserUnconfirmedTx: boolean
+  hasUnconfirmedTx: boolean
+  status: string //'QUOTE' | 'INITIATED'
+  userAgent: string //userAgent version
+  swapExpiration: number
+  nodeSwapExpiration: number
+  fromRateUsd: number
+  toRateUsd: number
+  fromAmountUsd: number
+  toAmountUsd: number
+  fromCounterPartyAddress: string
+  toCounterPartyAddress: string
+  createdAt: string
+  updatedAt: string
+  totalAgentFeeUsd: number
+  totalUserFeeUsd: number
+  totalFeeUsd: number
+}
+
+export type RequestDataType = {
+  from: string
+  to: string
+  fromAmount: number
+  toAmount: number
+}
+
+export interface MergedQuoteType extends LockedQuoteType {
+  fromAddress: string
+  toAddress: string
+  fee: number
+  claimFee: number
+}
+
+export type TriggerType =
+  | 'onInit'
+  | 'onAccountUpdate'
+  | 'onMarketDataUpdate'
+  | 'onFiatRatesUpdate'
+  | 'onTransactionUpdate'
 export type GasSpeedType = 'slow' | 'average' | 'fast'
 export type InitialStateType = {
   activeWalletId: string
@@ -283,6 +432,75 @@ export type ChainNetworkType = Record<
   Record<NetworkEnum.Mainnet & NetworkEnum.Testnet, BitcoinNetwork & EthereumNetwork>
 >
 
+export type MarketDataType = {
+  provider: string
+  from: string
+  to: string
+  rate: number
+  min: number
+  max: number
+}
+
+export type QuoteType = {
+  from: string
+  to: string
+  fromAddress?: string
+  toAddress?: string
+  fromAmount?: BigNumber
+  toAmount?: BigNumber
+  expireAt?: number
+  swapExpiration?: number
+  fee?: number
+  fromCounterPartyAddress?: string
+  toCounterPartyAddress?: string
+  path?: string
+  provider?: SwapProvidersEnum
+}
+
+export type SwapPayloadType = {
+  from: string
+  to: string
+  fromAmount: BigNumber
+  toAmount: BigNumber
+  type: string
+  network: NetworkEnum
+  startTime: number
+  walletId: string
+  fee: number
+  claimFee: number
+}
+
+export interface SwapTransactionType extends MergedQuoteType {
+  id: string
+  from: string
+  to: string
+  fromAmount: number
+  toAmount: number
+  expireAt: number
+  fee: number
+  status: string
+  statusMessage: string
+  secret: string
+  secretHash: string
+  slippage: number
+  fromFundHash: string
+  fromFundTx: Transaction
+  toFundHash?: string
+  toFundTx?: Transaction
+  toClaimHash?: string
+  toClaimTx?: Transaction
+  fundTxHash?: string //specific to ERC20
+  refundHash?: string
+  endTime?: number
+}
+
+export type TransactionStatusType = {
+  step: number
+  label: string
+  filterStatus: string
+  notification?: (...args: unknown[]) => Record<string, string>
+}
+
 // helper to get the type of an array element
 export type ArrayElement<A> = A extends readonly (infer T)[] ? T : never
 
@@ -290,6 +508,25 @@ export interface FlatState {
   assetCount: number
   totalBalance: BigNumber
   totalBalanceInFiat: BigNumber
+}
+
+export type HistoryItem = {
+  id: string
+  network?: NetworkEnum //TODO we might need this when the user changes the network before the transaction completes
+  walletId?: string
+  from: string
+  to: string
+  fromAddress: string
+  toAddress: string
+  startTime: number
+  endTime?: number
+  type: 'SWAP' | 'SEND' | 'RECEIVE'
+  sendTransaction?: Transaction
+  swapTransaction?: Partial<SwapTransactionType>
+  totalSteps: number
+  currentStep: number
+  status: string
+  statusMessage?: string
 }
 
 export interface StateType {
@@ -329,8 +566,8 @@ export interface StateType {
       }
     >
   >
-  history?: unknown
-  marketData?: unknown
+  history?: Record<NetworkEnum, Record<string, HistoryItem[]>>
+  marketData?: MarketDataType[]
   activeNetwork?: NetworkEnum
   activeWalletId?: string
   activeAsset?: unknown

@@ -1,14 +1,20 @@
-import { AccountType, Hardware, IAccount, IAsset, IConfig, Mnemonic, StateType } from '../types'
+import { AccountType, Hardware, IAccount, IAsset, IConfig, Mnemonic, StateType, TriggerType } from '../types'
 import { ChainId, assets as cryptoassets, chains, isEthereumChain } from '@liquality/cryptoassets'
 import { NetworkEnum } from '../types'
 import { Client } from '@liquality/client'
-import { Address, BigNumber, FeeDetails } from '@liquality/types'
+import { Address, BigNumber, FeeDetails, Transaction } from '@liquality/types'
 import { EthereumRpcFeeProvider } from '@liquality/ethereum-rpc-fee-provider'
 import { EthereumRpcProvider } from '@liquality/ethereum-rpc-provider'
 import { EthereumJsWalletProvider } from '@liquality/ethereum-js-wallet-provider'
 import Asset from '../asset'
 import { EthereumErc20Provider } from '@liquality/ethereum-erc20-provider'
 import axios from 'axios'
+import { EthereumErc20SwapProvider } from '@liquality/ethereum-erc20-swap-provider'
+import { EthereumErc20ScraperSwapFindProvider } from '@liquality/ethereum-erc20-scraper-swap-find-provider'
+import { EthereumSwapProvider } from '@liquality/ethereum-swap-provider'
+import { EthereumScraperSwapFindProvider } from '@liquality/ethereum-scraper-swap-find-provider'
+import { EthereumNetwork } from '@liquality/ethereum-networks'
+import { EthereumGasNowFeeProvider } from '@liquality/ethereum-gas-now-fee-provider'
 
 export default class RSKAccount implements IAccount {
   private _mnemonic: Mnemonic
@@ -21,9 +27,9 @@ export default class RSKAccount implements IAccount {
   private _derivationPath: string
   private _address: Address
   private _assets: IAsset[]
-  private _balance: BigNumber
   private _config: IConfig
   private _at: number
+  private _callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>
 
   constructor(
     config: IConfig,
@@ -32,11 +38,18 @@ export default class RSKAccount implements IAccount {
     chain: ChainId,
     network: NetworkEnum,
     assetSymbols: string[],
+    callbacks: Partial<Record<TriggerType, (...args: unknown[]) => void>>,
     hardware?: Hardware
   ) {
+    console.log('creating RSKAccount...')
     if (!mnemonic) {
       throw new Error('Unable to generate address. Mnemonic missing')
     }
+
+    const rskNetwork = config.getChainNetwork(chain, network)
+    const rpcApi = config.getSovrynRPCAPIUrl(network)
+    const feeProvider = new EthereumRpcFeeProvider({ slowMultiplier: 1, averageMultiplier: 1, fastMultiplier: 1.25 })
+    const scraperApi = config.getRSKScraperApi(network)
 
     this._config = config
     this._mnemonic = mnemonic
@@ -47,8 +60,16 @@ export default class RSKAccount implements IAccount {
     this._hardware = hardware
     this._at = Date.now()
     this._assets = []
+    this._callbacks = callbacks
     this._derivationPath = this.calculateDerivationPath()
-    this._client = this.createEthereumClient()
+    this._client = this.createRSKClient(
+      rskNetwork,
+      rpcApi,
+      scraperApi,
+      feeProvider,
+      this._mnemonic,
+      this._derivationPath
+    )
   }
 
   public async build(): Promise<AccountType> {
@@ -57,9 +78,13 @@ export default class RSKAccount implements IAccount {
     const balances: Record<string, number> = {}
 
     await this.getUsedAddress()
-    await this.getAssets()
-    const fiatRates = await this.fetchPricesForAssets('usd')
-    const feeDetails = await this.getFeeDetails()
+    await this.buildAssets()
+    const fiatRates = await this.fetchPricesForAssets('usd').catch((error) => {
+      console.log(`RSK fiat rates error: ${error}`)
+    })
+    const feeDetails = await this.getFeeDetails().catch((error) => {
+      console.log(`Rootstock fee details error: ${error}`)
+    })
 
     for (const asset of this._assets) {
       assets.push(asset.getSymbol())
@@ -67,7 +92,7 @@ export default class RSKAccount implements IAccount {
       balances[asset.getSymbol()] = (await asset.getBalance()).toNumber()
     }
 
-    return {
+    const account: AccountType = {
       name: `${chains[this._chain]?.name} 1`,
       chain: this._chain,
       type: 'default',
@@ -75,28 +100,18 @@ export default class RSKAccount implements IAccount {
       assets,
       addresses,
       balances,
-      fiatRates,
-      feeDetails,
       color: '#FFF',
       createdAt: this._at,
       updatedAt: this._at
     }
+
+    if (fiatRates) account.fiatRates = fiatRates
+    if (feeDetails) account.feeDetails = feeDetails
+
+    return account
   }
 
-  public async getAssets(): Promise<IAsset[]> {
-    const _assetSymbols = this._config.getDefaultEnabledAssets(this._network)
-    if (!this._address) this.getUsedAddress()
-    this._assets = _assetSymbols
-      .filter((asset) => {
-        return cryptoassets[asset]?.chain === this._chain
-      })
-      .map((asset) => {
-        if (asset && cryptoassets[asset]?.type === 'erc20') {
-          const client = this.createEthereumClient(asset)
-          return new Asset(asset, this._address.address, client)
-        }
-        return new Asset(asset, this._address.address, this._client)
-      })
+  public getAssets(): IAsset[] {
     return this._assets
   }
 
@@ -115,8 +130,17 @@ export default class RSKAccount implements IAccount {
   public async getUsedAddress(): Promise<Address> {
     if (this._address) return this._address
     const addresses = await this._client.wallet.getUsedAddresses(100)
-    if (addresses.length == 0) throw new Error('No addresses found')
-    this._address = addresses[0]
+    if (addresses.length == 0) {
+      const unusedAddress = await this.getUnusedAddress()
+
+      if (!unusedAddress) {
+        throw new Error('No Ethereum addresses found')
+      } else {
+        this._address = unusedAddress
+      }
+    } else {
+      this._address = addresses[0]
+    }
     return this._address
   }
 
@@ -146,12 +170,10 @@ export default class RSKAccount implements IAccount {
     const { data } = await axios.get(`${this._config.getPriceFetcherUrl()}/simple/price`, {
       params: { vs_currencies: toCurrency, ids: coindIds.join(',') }
     })
-    const prices = Object.keys(data).reduce((acc: Record<string, number>, coinGeckoId) => {
+    return Object.keys(data).reduce((acc: Record<string, number>, coinGeckoId) => {
       acc[reverseMap[coinGeckoId]] = data[coinGeckoId][toCurrency.toLowerCase()]
       return acc
     }, {})
-
-    return prices
   }
 
   public async refresh(): Promise<AccountType> {
@@ -181,31 +203,73 @@ export default class RSKAccount implements IAccount {
     }
   }
 
-  private createEthereumClient(asset?: string) {
-    const isTestnet = this._network === 'testnet'
+  public getClient(): Client {
+    return this._client
+  }
+
+  public async speedUpTransaction(transaction: string | Transaction, newFee: number): Promise<Transaction> {
+    return await this._client.chain.updateTransactionFee(transaction, newFee)
+  }
+
+  private async buildAssets(): Promise<IAsset[]> {
+    const _assetSymbols = this._config.getDefaultEnabledAssets(this._network)
     const rskNetwork = this._config.getChainNetwork(this._chain, this._network)
-    const rpcApi = this._config.getSovereignRPCAPIUrl(this._network)
+    const rpcApi = this._config.getSovrynRPCAPIUrl(this._network)
     const feeProvider = new EthereumRpcFeeProvider({ slowMultiplier: 1, averageMultiplier: 1, fastMultiplier: 1.25 })
+    const scraperApi = this._config.getRSKScraperApi(this._network)
+
+    this._assets = _assetSymbols
+      .filter((asset) => {
+        return cryptoassets[asset]?.chain === this._chain
+      })
+      .map((asset) => {
+        const client = this.createRSKClient(
+          rskNetwork,
+          rpcApi,
+          scraperApi,
+          feeProvider,
+          this._mnemonic,
+          this._derivationPath,
+          asset
+        )
+        return new Asset(asset, this._address.address, client, this._callbacks)
+      })
+    return this._assets
+  }
+
+  private createRSKClient(
+    rskNetwork: EthereumNetwork,
+    rpcApi: string,
+    scraperApi: string,
+    feeProvider: EthereumRpcFeeProvider | EthereumGasNowFeeProvider,
+    mnemonic: string,
+    derivationPath: string,
+    asset?: string
+  ) {
     const ethClient = new Client()
-
     ethClient.addProvider(new EthereumRpcProvider({ uri: rpcApi }))
-
+    ethClient.addProvider(feeProvider)
     ethClient.addProvider(
       new EthereumJsWalletProvider({
         network: rskNetwork,
-        mnemonic: this._mnemonic,
-        derivationPath: this._derivationPath
+        mnemonic,
+        derivationPath
       })
     )
 
     if (asset && cryptoassets[asset]?.type === 'erc20') {
-      const contractAddress = isTestnet
+      const contractAddress = rskNetwork.isTestnet
         ? this._config.getTestnetContractAddress(asset)
         : cryptoassets[asset].contractAddress
+      console.log('---->', rskNetwork.isTestnet, asset && cryptoassets[asset]?.type, contractAddress)
       ethClient.addProvider(new EthereumErc20Provider(contractAddress))
+      ethClient.addProvider(new EthereumErc20SwapProvider())
+      if (scraperApi) ethClient.addProvider(new EthereumErc20ScraperSwapFindProvider(scraperApi))
+    } else {
+      ethClient.addProvider(new EthereumSwapProvider())
+      if (scraperApi) ethClient.addProvider(new EthereumScraperSwapFindProvider(scraperApi))
     }
 
-    ethClient.addProvider(feeProvider)
     return ethClient
   }
 }

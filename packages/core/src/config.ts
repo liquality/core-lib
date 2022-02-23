@@ -1,7 +1,9 @@
-import { ChainNetworkType, IConfig, NetworkEnum } from './types'
+import { ChainNetworkType, IConfig, NetworkEnum, SwapProvidersEnum, SwapProviderType } from './types'
 import { ChainId } from '@liquality/cryptoassets'
 import { BitcoinNetwork, BitcoinNetworks } from '@liquality/bitcoin-networks'
 import { EthereumNetwork, EthereumNetworks } from '@liquality/ethereum-networks'
+import SovrynMainnetAddresses from '@blobfishkate/sovryncontracts/contracts-mainnet.json'
+import SovrynTestnetAddresses from '@blobfishkate/sovryncontracts/contracts-testnet.json'
 
 const COIN_GECKO_API = 'https://api.coingecko.com/api/v3'
 
@@ -42,18 +44,18 @@ const DefaultAssets: Record<NetworkEnum, string[]> = {
   mainnet: [
     'BTC',
     'ETH',
-    'DAI',
-    'USDC',
-    'USDT',
-    'WBTC',
-    'UNI',
     'RBTC',
-    'SOV',
-    'BNB',
-    'NEAR',
-    'MATIC',
-    'PWETH',
-    'ARBETH'
+    'SOV'
+    // 'DAI',
+    // 'USDC',
+    // 'USDT',
+    // 'WBTC',
+    // 'UNI',
+    // 'BNB',
+    // 'NEAR',
+    // 'MATIC',
+    // 'PWETH',
+    // 'ARBETH'
   ],
   // testnet: ['BTC', 'ETH', 'DAI', 'RBTC', 'BNB', 'NEAR', 'SOV', 'MATIC', 'PWETH', 'ARBETH']
   testnet: ['BTC', 'ETH', 'RBTC', 'SOV']
@@ -63,11 +65,11 @@ const DefaultChains: Record<NetworkEnum, ChainId[]> = {
   [NetworkEnum.Mainnet]: [
     ChainId.Bitcoin,
     ChainId.Ethereum,
-    ChainId.Rootstock,
-    ChainId.BinanceSmartChain,
-    ChainId.Near,
-    ChainId.Polygon,
-    ChainId.Arbitrum
+    ChainId.Rootstock
+    // ChainId.BinanceSmartChain,
+    // ChainId.Near,
+    // ChainId.Polygon,
+    // ChainId.Arbitrum
   ],
   [NetworkEnum.Testnet]: [ChainId.Ethereum, ChainId.Bitcoin, ChainId.Rootstock]
 }
@@ -77,17 +79,69 @@ const exploraApis: Record<NetworkEnum, string> = {
   [NetworkEnum.Mainnet]: 'https://api-mainnet-bitcoin-electrs.liquality.io'
 }
 
+const ethereumScraperApis: Record<NetworkEnum, string> = {
+  [NetworkEnum.Testnet]: 'https://eth-ropsten-api.liq-chainhub.net/',
+  [NetworkEnum.Mainnet]: 'https://eth-mainnet-api.liq-chainhub.net/'
+}
+
+const rskScraperApis: Record<NetworkEnum, string> = {
+  [NetworkEnum.Testnet]: 'https://rsk-testnet-api.liq-chainhub.net/',
+  [NetworkEnum.Mainnet]: 'https://rsk-mainnet-api.liq-chainhub.net/'
+}
+
 const batchEsploraApis: Record<NetworkEnum, string> = {
   [NetworkEnum.Testnet]: 'https://liquality.io/electrs-testnet-batch',
   [NetworkEnum.Mainnet]: 'https://api-mainnet-bitcoin-electrs-batch.liquality.io'
 }
 
-const sovereignApis: Record<NetworkEnum, string> = {
+const sovrynApis: Record<NetworkEnum, string> = {
   [NetworkEnum.Testnet]: 'https://testnet.sovryn.app/rpc',
   [NetworkEnum.Mainnet]: 'https://mainnet.sovryn.app/rpc'
 }
 
 const DefaultNetwork = NetworkEnum.Testnet
+
+const swapProviders: Record<NetworkEnum, Partial<Record<SwapProvidersEnum, SwapProviderType>>> = {
+  [NetworkEnum.Testnet]: {
+    [SwapProvidersEnum.LIQUALITY]: {
+      name: 'Liquality',
+      icon: 'liquality.svg',
+      type: SwapProvidersEnum.LIQUALITY,
+      agent: process.env.AGENT_TESTNET_URL || 'https://liquality.io/swap-testnet-dev/agent'
+    },
+    [SwapProvidersEnum.SOVRYN]: {
+      name: 'Sovyrn',
+      icon: 'sovryn.svg',
+      type: SwapProvidersEnum.SOVRYN,
+      routerAddress: SovrynTestnetAddresses.swapNetwork,
+      routerAddressRBTC: SovrynTestnetAddresses.proxy3,
+      rpcURL: process.env.SOVRYN_RPC_URL_TESTNET || 'https://testnet.sovryn.app/rpc'
+    }
+  },
+  [NetworkEnum.Mainnet]: {
+    [SwapProvidersEnum.LIQUALITY]: {
+      name: 'Liquality',
+      icon: 'liquality.svg',
+      type: SwapProvidersEnum.LIQUALITY,
+      agent: 'https://liquality.io/swap-dev/agent'
+    },
+    [SwapProvidersEnum.LIQUALITYBOOST]: {
+      name: 'Liquality Boost',
+      type: SwapProvidersEnum.LIQUALITYBOOST,
+      network: 'mainnet',
+      icon: 'liqualityboost.svg',
+      supportedBridgeAssets: ['MATIC']
+    },
+    [SwapProvidersEnum.SOVRYN]: {
+      name: 'Sovyrn',
+      icon: 'sovryn.svg',
+      type: SwapProvidersEnum.SOVRYN,
+      routerAddress: SovrynMainnetAddresses.swapNetwork,
+      routerAddressRBTC: SovrynMainnetAddresses.proxy3,
+      rpcURL: process.env.SOVRYN_RPC_URL_MAINNET || 'https://mainnet.sovryn.app/rpc'
+    }
+  }
+}
 export class Config implements IConfig {
   private readonly _infuraAPIKey: string
 
@@ -109,6 +163,14 @@ export class Config implements IConfig {
 
   public getBitcoinTestnet(): string {
     return exploraApis[NetworkEnum.Testnet]
+  }
+
+  public getEthereumScraperApi(network: NetworkEnum): string {
+    return ethereumScraperApis[network]
+  }
+
+  public getRSKScraperApi(network: NetworkEnum): string {
+    return rskScraperApis[network]
   }
 
   public getBatchEsploraAPIUrl(network: NetworkEnum): string {
@@ -147,7 +209,23 @@ export class Config implements IConfig {
     return TESTNET_CONTRACT_ADDRESSES[assetSymbol]
   }
 
-  public getSovereignRPCAPIUrl(network: NetworkEnum): string {
-    return sovereignApis[network]
+  public getSovrynRPCAPIUrl(network: NetworkEnum): string {
+    return sovrynApis[network]
+  }
+
+  public getSwapProvider(network: NetworkEnum, providerId: string): SwapProviderType {
+    return swapProviders[network][providerId]
+  }
+
+  public getSwapProviders(network: NetworkEnum): Partial<Record<SwapProvidersEnum, SwapProviderType>> {
+    return swapProviders[network]
+  }
+
+  public getAgentUrl(network: NetworkEnum, provider: SwapProvidersEnum): string {
+    return swapProviders[network][provider].agent
+  }
+
+  public getInfuraAPIKey(): string {
+    return this._infuraAPIKey
   }
 }
