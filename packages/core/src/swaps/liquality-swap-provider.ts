@@ -169,12 +169,12 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
     }
 
     //Make sure the quote has not expired
-    if (Date.now() >= mergedQuote.expiresAt) {
-      throw new Error('The quote is expired.')
+    if (new Date().getSeconds() >= mergedQuote.expiresAt) {
+      throw new Error(`The quote is expired with expiration ${mergedQuote.expiresAt} - ${new Date().getSeconds()}`)
     }
 
     //Get a new client
-    const assets = await fromAccount.getAssets()
+    const assets = fromAccount.getAssets()
     const fromClient =
       assets.length === 0
         ? fromAccount.getClient()
@@ -487,6 +487,7 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
       swap.claimFee
     )
 
+    console.log('toClaimTx: ', toClaimTx)
     return {
       toClaimHash: toClaimTx.hash,
       toClaimTx,
@@ -502,6 +503,7 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
     const toClient = await this.getClient(toAccount, false, swap)
 
     try {
+      console.log('toClaimHash: ', swap.toClaimHash)
       const tx = await toClient.chain.getTransactionByHash(swap.toClaimHash)
 
       if (tx && tx.confirmations > 0) {
@@ -525,10 +527,13 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
 
   public async waitForRefund(
     fromAccount: IAccount,
+    toAccount: IAccount,
     swap: Partial<SwapTransactionType>
   ): Promise<Partial<SwapTransactionType>> {
     if (await this.canRefund(fromAccount, swap)) {
       return { status: 'GET_REFUND' }
+    } else if (await this.hasSwapExpired(toAccount, swap)) {
+      return { status: 'WAITING_FOR_REFUND' }
     }
 
     return null
@@ -583,7 +588,7 @@ export default class LiqualitySwapProvider extends SwapProvider implements IAtom
 
   //Helper methods
   private async getClient(account: IAccount, from: boolean, swap: Partial<SwapTransactionType>): Promise<Client> {
-    const assets = await account.getAssets()
+    const assets = account.getAssets()
     const client =
       assets.length === 0
         ? account.getClient()

@@ -31,7 +31,11 @@ interface IAtomicSwapProvider {
     swap: Partial<SwapTransactionType>
   ): Promise<Partial<SwapTransactionType>>
 
-  waitForRefund(fromAccount: IAccount, swap: Partial<SwapTransactionType>): Promise<Partial<SwapTransactionType>>
+  waitForRefund(
+    fromAccount: IAccount,
+    toAccount: IAccount,
+    swap: Partial<SwapTransactionType>
+  ): Promise<Partial<SwapTransactionType>>
 
   refundSwap(account: IAccount, swap: SwapTransactionType): Promise<Partial<SwapTransactionType>>
 

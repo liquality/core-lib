@@ -84,12 +84,17 @@ const ethereumScraperApis: Record<NetworkEnum, string> = {
   [NetworkEnum.Mainnet]: 'https://eth-mainnet-api.liq-chainhub.net/'
 }
 
+const rskScraperApis: Record<NetworkEnum, string> = {
+  [NetworkEnum.Testnet]: 'https://rsk-testnet-api.liq-chainhub.net/',
+  [NetworkEnum.Mainnet]: 'https://rsk-mainnet-api.liq-chainhub.net/'
+}
+
 const batchEsploraApis: Record<NetworkEnum, string> = {
   [NetworkEnum.Testnet]: 'https://liquality.io/electrs-testnet-batch',
   [NetworkEnum.Mainnet]: 'https://api-mainnet-bitcoin-electrs-batch.liquality.io'
 }
 
-const sovereignApis: Record<NetworkEnum, string> = {
+const sovrynApis: Record<NetworkEnum, string> = {
   [NetworkEnum.Testnet]: 'https://testnet.sovryn.app/rpc',
   [NetworkEnum.Mainnet]: 'https://mainnet.sovryn.app/rpc'
 }
@@ -110,7 +115,7 @@ const swapProviders: Record<NetworkEnum, Partial<Record<SwapProvidersEnum, SwapP
       type: SwapProvidersEnum.SOVRYN,
       routerAddress: SovrynTestnetAddresses.swapNetwork,
       routerAddressRBTC: SovrynTestnetAddresses.proxy3,
-      rpcURL: process.env.SOVRYN_RPC_URL_TESTNET
+      rpcURL: process.env.SOVRYN_RPC_URL_TESTNET || 'https://testnet.sovryn.app/rpc'
     }
   },
   [NetworkEnum.Mainnet]: {
@@ -133,7 +138,7 @@ const swapProviders: Record<NetworkEnum, Partial<Record<SwapProvidersEnum, SwapP
       type: SwapProvidersEnum.SOVRYN,
       routerAddress: SovrynMainnetAddresses.swapNetwork,
       routerAddressRBTC: SovrynMainnetAddresses.proxy3,
-      rpcURL: process.env.SOVRYN_RPC_URL_MAINNET
+      rpcURL: process.env.SOVRYN_RPC_URL_MAINNET || 'https://mainnet.sovryn.app/rpc'
     }
   }
 }
@@ -162,6 +167,10 @@ export class Config implements IConfig {
 
   public getEthereumScraperApi(network: NetworkEnum): string {
     return ethereumScraperApis[network]
+  }
+
+  public getRSKScraperApi(network: NetworkEnum): string {
+    return rskScraperApis[network]
   }
 
   public getBatchEsploraAPIUrl(network: NetworkEnum): string {
@@ -200,8 +209,8 @@ export class Config implements IConfig {
     return TESTNET_CONTRACT_ADDRESSES[assetSymbol]
   }
 
-  public getSovereignRPCAPIUrl(network: NetworkEnum): string {
-    return sovereignApis[network]
+  public getSovrynRPCAPIUrl(network: NetworkEnum): string {
+    return sovrynApis[network]
   }
 
   public getSwapProvider(network: NetworkEnum, providerId: string): SwapProviderType {

@@ -19,7 +19,6 @@ abstract class SwapProvider {
 
   /**
    * Get the supported pairs of this provider for this network
-   * @param network
    */
   abstract getSupportedPairs(): Promise<MarketDataType[]>
 
@@ -36,7 +35,6 @@ abstract class SwapProvider {
    * Create a new swap for the given quote
    * @param fromAccount
    * @param toAccount
-   * @param fromAsset
    * @param quote
    */
   abstract performSwap(

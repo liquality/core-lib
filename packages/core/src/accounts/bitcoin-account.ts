@@ -84,8 +84,8 @@ export default class BitcoinAccount implements IAccount {
     return `${BTC_ADDRESS_TYPE_TO_PREFIX[bitcoin.AddressType.BECH32]}'/${bitcoinNetwork.coinType}'/${this._index}'`
   }
 
-  public getAssets(): Promise<IAsset[]> {
-    return Promise.resolve([])
+  public getAssets(): IAsset[] {
+    return []
   }
 
   public async getUnusedAddress(): Promise<Address> {

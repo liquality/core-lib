@@ -177,6 +177,7 @@ export default class Wallet implements IWallet<StateType> {
   }
 
   public async addAccount(chain: ChainId, network: NetworkEnum, hardware?: Hardware): Promise<IAccount> {
+    console.log('adding account: ', chain)
     if (hardware) return
     const accountKey = `${chain}-${network}`
     if (this._accounts[accountKey]) return this._accounts[accountKey]

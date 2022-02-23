@@ -89,6 +89,7 @@ export interface IConfig {
   getBitcoinMainnet(): string
   getBitcoinTestnet(): string
   getEthereumScraperApi(network: NetworkEnum): string
+  getRSKScraperApi(network: NetworkEnum): string
   getBatchEsploraAPIUrl(network: NetworkEnum): string
   getChainNetwork(chain: ChainId, network: NetworkEnum): BitcoinNetwork & EthereumNetwork
   getDefaultEnabledChains(network: NetworkEnum): ChainId[]
@@ -98,7 +99,7 @@ export interface IConfig {
   getChainColor(chain: ChainId): string
   getBitcoinFeeUrl(): string
   getTestnetContractAddress(assetSymbol: string): string
-  getSovereignRPCAPIUrl(network: NetworkEnum): string
+  getSovrynRPCAPIUrl(network: NetworkEnum): string
   getSwapProvider(network: NetworkEnum, providerId: string): SwapProviderType
   getSwapProviders(network: NetworkEnum): Partial<Record<SwapProvidersEnum, SwapProviderType>>
   getAgentUrl(network: NetworkEnum, providerId: SwapProvidersEnum): string
@@ -233,7 +234,7 @@ export interface IAccount {
    * Fetches all the assets belonging to the associated account.
    * It only exposes the assets that are enabled in the Config object
    */
-  getAssets(): Promise<IAsset[]>
+  getAssets(): IAsset[]
 
   /**
    * Fetches an address that has not seen any transactions
@@ -525,6 +526,7 @@ export type HistoryItem = {
   totalSteps: number
   currentStep: number
   status: string
+  statusMessage?: string
 }
 
 export interface StateType {

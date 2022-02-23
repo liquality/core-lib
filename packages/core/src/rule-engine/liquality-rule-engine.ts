@@ -43,6 +43,7 @@ class LiqualityRuleEngine implements IRuleEngine {
         type: 'SWAP',
         currentStep: this._currentStep,
         status: payload.status,
+        statusMessage: payload.statusMessage,
         endTime: payload.endTime
       })
     }
@@ -56,7 +57,7 @@ class LiqualityRuleEngine implements IRuleEngine {
   public async start(): Promise<void> {
     console.log('Starting liquality swap rules engine:', this._swap)
 
-    const canRefund = await this._swapProvider.waitForRefund(this._fromAccount, this._swap)
+    const canRefund = await this._swapProvider.waitForRefund(this._fromAccount, this._toAccount, this._swap)
     console.log('canRefund: ', canRefund)
     if (canRefund) {
       for (const rule of this.getRefundRules(this._toAccount, this._fromAccount, this._swapProvider)) {
@@ -128,7 +129,7 @@ class LiqualityRuleEngine implements IRuleEngine {
       10,
       async (event, almanac) => {
         console.log('WAITING_FOR_REFUND')
-        const updates = await swapProvider.waitForRefund(fromAccount, this._swap)
+        const updates = await swapProvider.waitForRefund(fromAccount, toAccount, this._swap)
 
         console.log('updates:', updates)
         if (updates) {
@@ -335,7 +336,7 @@ class LiqualityRuleEngine implements IRuleEngine {
       'READY_TO_CLAIM',
       2,
       async (event, almanac) => {
-        console.log('READY_TO_CLAIM')
+        console.log('READY_TO_CLAIM ', this._swap.toClaimHash)
         if (!this._swap.toClaimHash) {
           const { toClaimHash, toClaimTx, status } = await swapProvider.claimSwap(fromAccount, toAccount, this._swap)
           this._swap = {
@@ -346,6 +347,8 @@ class LiqualityRuleEngine implements IRuleEngine {
             statusMessage: `Claiming ${this._swap.to}`
           }
         }
+
+        console.log('Swap: ', this._swap)
 
         this._currentStep++
         if (this._callback) this._callback(this._swap)

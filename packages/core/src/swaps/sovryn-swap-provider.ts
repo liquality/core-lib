@@ -105,6 +105,7 @@ class SovrynSwapProvider extends SwapProvider {
     toAccount: IAccount,
     quote: Partial<SwapPayloadType>
   ): Promise<Partial<SwapTransactionType>> {
+    console.log('sovryn swap...')
     const approvalRequired = isERC20(quote.from)
     const updates = approvalRequired
       ? await this.approveTokens(fromAccount, quote)
@@ -147,9 +148,7 @@ class SovrynSwapProvider extends SwapProvider {
     if (txType !== this.fromTxType) throw new Error(`Invalid tx type ${txType}`)
 
     const nativeAsset = chains[cryptoassets[fromAsset].chain].nativeAsset
-    const client = ((await fromAccount.getAssets()) || [])
-      .filter((asset) => asset.getSymbol() === fromAsset)[0]
-      .getClient()
+    const client = (fromAccount.getAssets() || []).filter((asset) => asset.getSymbol() === fromAsset)[0].getClient()
     // const account = this.getAccount(quote.fromAccountId)
     // const client = this.getClient(this, walletId, quote.from, account?.type)
 
