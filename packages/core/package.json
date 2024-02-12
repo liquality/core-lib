@@ -35,7 +35,7 @@
     "@liquality/ethereum-rpc-provider": "^1.9.1",
     "@liquality/ethereum-erc20-provider": "^1.9.1",
     "@liquality/types": "^1.9.1",
-    "axios": "^0.24.0",
+    "axios": "^0.28.0",
     "bip39": "^3.0.4",
     "crypto-js": "^4.1.1",
     "tslib": "^2.3.1",
